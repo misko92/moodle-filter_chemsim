@@ -94,14 +94,17 @@ details { margin-top: 8px; font-size: 14px; } summary { cursor: pointer; color: 
     </section>
   </div>
 </div>
-<div class="note">Rules used: H gets 2 electrons; C, N, O and F get exactly 8; B and Be may have fewer than 8; atoms in period 3 and below may have more than 8 when they are the central atom. The best structure is the one with the smallest formal charges, with any negative formal charge on the most electronegative atom.</div>
+<div class="note">Electronegativities (Pauling, as in the notes): H 2.1, Be 1.5, B 2.0, C 2.5, N 3.0, O 3.5, F 4.0, Si 1.8, P 2.1, S 2.5, Cl 3.0, Br 2.8, I 2.5, Xe 2.6. A bond with ΔEN of 0.4 or less is treated as nonpolar.<br>Rules used: H gets 2 electrons; C, N, O and F get exactly 8; B and Be may have fewer than 8; atoms in period 3 and below may have more than 8 when they are the central atom. The best structure is the one with the smallest formal charges, with any negative formal charge on the most electronegative atom.</div>
 
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 // ---------------------------------------------------------------- elements
 const VAL = {H: 1, Be: 2, B: 3, C: 4, N: 5, O: 6, F: 7, Si: 4, P: 5, S: 6, Cl: 7, Br: 7, I: 7, Xe: 8};
-const EN = {H: 2.20, Be: 1.57, B: 2.04, C: 2.55, N: 3.04, O: 3.44, F: 3.98, Si: 1.90, P: 2.19, S: 2.58, Cl: 3.16, Br: 2.96, I: 2.66, Xe: 2.60};
+// Pauling values as in the course notes (3.1); the notes give no value for Xe, 2.6 is the usual one
+const EN = {H: 2.1, Be: 1.5, B: 2.0, C: 2.5, N: 3.0, O: 3.5, F: 4.0, Si: 1.8, P: 2.1, S: 2.5, Cl: 3.0, Br: 2.8, I: 2.5, Xe: 2.6};
+const dEN = (a, b) => Math.round((EN[a] - EN[b]) * 10) / 10;   // ΔEN 0.4 or less: nonpolar bond
+const polarBond = d => Math.abs(d) > 0.4 + 1e-9;
 const PERIOD = {H: 1, Be: 2, B: 2, C: 2, N: 2, O: 2, F: 2, Si: 3, P: 3, S: 3, Cl: 3, Br: 4, I: 5, Xe: 5};
 const CPK = {H: "#f8fafc", Be: "#a3e635", B: "#fda4af", C: "#475569", N: "#3b82f6", O: "#ef4444", F: "#84cc16", Si: "#d4a373", P: "#f97316", S: "#eab308", Cl: "#22c55e", Br: "#9f1239", I: "#7e22ce", Xe: "#06b6d4"};
 // ---------------------------------------------------------------- species
@@ -390,12 +393,20 @@ function shape() {
   drawLewis(mg, sp, I.b.ord, I.b.lp, 520, 220, 52, {fc: true, ec: false});
   // polarity from bond dipoles
   const [lpd, bd] = domainDirs(I.n, I.nlp);
-  let net = [0, 0, 0]; for (let k = 0; k < I.nt; k++) { const t = sp.atoms[k + 1].el, d = EN[t] - EN[sp.atoms[0].el]; net = net.map((x, j) => x + d * bd[k][j]); }
-  const pol = Math.hypot(...net) > 0.05;
+  const ce = sp.atoms[0].el;
+  let net = [0, 0, 0]; for (let k = 0; k < I.nt; k++) { const d = dEN(sp.atoms[k + 1].el, ce); if (polarBond(d)) net = net.map((x, j) => x + d * bd[k][j]); }
+  const pol = Math.hypot(...net) > 0.05, anyPolar = sp.atoms.slice(1).some(a => polarBond(dEN(a.el, ce)));
+  const seen = new Set(), bondRows = [];
+  sp.bonds.forEach(([x, y], k) => {
+    const t = sp.atoms[y].el, sym = ["", "–", "=", "≡"][I.b.ord[k]], lbl = ce + sym + t; if (seen.has(lbl)) return; seen.add(lbl);
+    const d = Math.abs(dEN(t, ce));
+    bondRows.push(`${lbl}: ΔEN = ${d.toFixed(1)}, ${d <= 0.4 + 1e-9 ? "nonpolar" : d > 1.8 ? "very polar (above 1.8)" : "polar"}`);
+  });
   $("shapetab").innerHTML = [
     ["Electron domains on " + sp.atoms[0].el, `${I.n} (${I.nt} bonded atom${I.nt > 1 ? "s" : ""} + ${I.nlp} lone pair${I.nlp === 1 ? "" : "s"}); a double or triple bond counts as one domain`],
     ["Electron-domain geometry", I.g[0]], ["Molecular geometry", `<b>${I.g[1]}</b>`], ["Bond angle", I.g[2]], ["Hybridization", I.g[3]],
-    ["Polarity", sp.charge ? "an ion (polarity is used for neutral molecules)" : pol ? "<b>polar</b>: the bond dipoles do not cancel" : (sp.atoms.slice(1).every(a => EN[a.el] === EN[sp.atoms[0].el]) ? "nonpolar (nonpolar bonds)" : "<b>nonpolar</b>: the bond dipoles cancel")]
+    ["Bonds", bondRows.join("<br>")],
+    ["Polarity", sp.charge ? "an ion (polarity is used for neutral molecules)" : pol ? "<b>polar</b>: the bond dipoles do not cancel" : !anyPolar ? "<b>nonpolar</b>: every bond is nonpolar (ΔEN ≤ 0.4)" : "<b>nonpolar</b>: the bond dipoles cancel"]
   ].map(([a, b]) => `<tr><th>${a}</th><td>${b}</td></tr>`).join("");
   const T = {
     0: "With no lone pairs on the central atom, the molecular geometry is the same as the electron-domain geometry.",
@@ -404,6 +415,7 @@ function shape() {
   };
   let w = T[Math.min(3, I.nlp)];
   if (I.n === 5 && I.nlp) w += " In a trigonal bipyramid, lone pairs always go in the <b>equatorial</b> positions, where they have more room (fewer 90° neighbours).";
+  if (sp.id === "O3") w += " <br><b>Note on O₃:</b> by ΔEN every O–O bond is nonpolar, but ozone is actually <b>slightly polar</b>: the central O carries a positive formal charge and the bent shape puts the negative charge toward the ends.";
   if (I.n === 6 && I.nlp === 2) w += " With two lone pairs in an octahedron, they sit <b>opposite</b> each other, leaving a square planar shape.";
   $("shapewhy").innerHTML = w;
 }
@@ -432,11 +444,16 @@ function draw3D() {
       const p = proj(it.d), t = sp.atoms[it.k + 1].el;
       g.strokeStyle = "#64748b"; g.lineWidth = 7 * p.s; g.lineCap = "round"; g.beginPath(); g.moveTo(o.x, o.y); g.lineTo(p.x, p.y); g.stroke();
       if ($("showdip").checked) {
-        const dEN = EN[t] - EN[ce];
-        if (Math.abs(dEN) > 0.05) {
-          const from = dEN > 0 ? 0.25 : 0.75, to = dEN > 0 ? 0.75 : 0.25, a = proj(it.d.map(x => x * from)), b2 = proj(it.d.map(x => x * to));
-          g.strokeStyle = "#db2777"; g.lineWidth = 2.5; g.beginPath(); g.moveTo(a.x, a.y - 10); g.lineTo(b2.x, b2.y - 10); g.stroke();
-          const ang = Math.atan2(b2.y - a.y, b2.x - a.x); g.beginPath(); g.moveTo(b2.x, b2.y - 10); g.lineTo(b2.x - 9 * Math.cos(ang - 0.45), b2.y - 10 - 9 * Math.sin(ang - 0.45)); g.lineTo(b2.x - 9 * Math.cos(ang + 0.45), b2.y - 10 - 9 * Math.sin(ang + 0.45)); g.closePath(); g.fillStyle = "#db2777"; g.fill();
+        const d = dEN(t, ce);
+        if (polarBond(d)) {
+          // arrow toward the more electronegative atom, longer for a bigger ΔEN, crossed tail at the δ+ end
+          const k = 0.08 + 0.11 * Math.min(Math.abs(d), 2), from = d > 0 ? 0.5 - k : 0.5 + k, to = d > 0 ? 0.5 + k : 0.5 - k;
+          const a = proj(it.d.map(x => x * from)), b2 = proj(it.d.map(x => x * to)), ang = Math.atan2(b2.y - a.y, b2.x - a.x), off = -10;
+          g.strokeStyle = "#db2777"; g.fillStyle = "#db2777"; g.lineWidth = 2.5; g.lineCap = "butt";
+          g.beginPath(); g.moveTo(a.x, a.y + off); g.lineTo(b2.x, b2.y + off); g.stroke();
+          g.beginPath(); g.moveTo(b2.x, b2.y + off); g.lineTo(b2.x - 9 * Math.cos(ang - 0.45), b2.y + off - 9 * Math.sin(ang - 0.45)); g.lineTo(b2.x - 9 * Math.cos(ang + 0.45), b2.y + off - 9 * Math.sin(ang + 0.45)); g.closePath(); g.fill();
+          const cx = a.x + 7 * Math.cos(ang), cy = a.y + off + 7 * Math.sin(ang);
+          g.beginPath(); g.moveTo(cx - 6 * Math.sin(ang), cy + 6 * Math.cos(ang)); g.lineTo(cx + 6 * Math.sin(ang), cy - 6 * Math.cos(ang)); g.stroke();
         }
       }
       const r = (t === "H" ? 15 : 22) * p.s, gr = g.createRadialGradient(p.x - r / 3, p.y - r / 3, 2, p.x, p.y, r);
@@ -482,7 +499,7 @@ const TOURS = {
     ["#infocard", "How to count the valence electrons, what is wrong (or right) with your structure, and how many resonance structures there are."]
   ],
   shape: [
-    ["#d3", "The 3D shape predicted by VSEPR from the best Lewis structure. Drag to turn it. Blue clouds are lone pairs; pink arrows are bond dipoles."],
+    ["#d3", "The 3D shape predicted by VSEPR from the best Lewis structure. Drag to turn it. Blue clouds are lone pairs; pink arrows are bond dipoles (only for polar bonds, ΔEN above 0.4)."],
     ["#infocard", "Electron domains, electron-domain and molecular geometry, bond angle, hybridization and polarity."]
   ]
 };
