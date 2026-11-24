@@ -72,7 +72,7 @@ h2 { font-size: 15px; margin: 0 0 4px; }
       <b>Other</b>
       <div><button data-a="cat" id="b-cat">Add catalyst</button><button data-a="ar">Add argon (same V)</button></div>
       <b></b>
-      <div><button id="b-pause">❚❚ Pause</button><button id="b-reset">Start over</button><label class="chk" id="predict-lbl"><input type="checkbox" id="predict"> Predict first</label></div>
+      <div><button id="b-pause" class="on">▶ Start</button><button id="b-reset">Start over</button><label class="chk" id="predict-lbl"><input type="checkbox" id="predict"> Predict first</label></div>
     </div>
     <div id="pred" class="predict" hidden></div>
   </div>
@@ -102,7 +102,7 @@ const $ = id => document.getElementById(id);
 // ---------------------------------------------------------------- model
 const TEMPS = [{label: "0 °C", K: 0.08, kr: 0.04, v: 42}, {label: "25 °C", K: 0.02, kr: 0.12, v: 62}, {label: "100 °C", K: 0.005, kr: 0.35, v: 95}];
 const VOLS = [0.5, 1, 2];
-const S = {eqm: false, nA: 120, nB: 0, nAr: 0, vi: 1, ti: 1, cat: false, t: 0, paused: false, parts: [], hist: [], marks: [], qs: null, wpx: 260, sampleT: 0, pending: null};
+const S = {started: false, eqm: false, nA: 120, nB: 0, nAr: 0, vi: 1, ti: 1, cat: false, t: 0, paused: true, parts: [], hist: [], marks: [], qs: null, wpx: 260, sampleT: 0, pending: null};
 const V = () => VOLS[S.vi];
 const T = () => TEMPS[S.ti];
 const K = () => T().K;
@@ -217,7 +217,12 @@ function drawBox() {
   }
   g.fillStyle = "#475569"; g.font = "13px Arial"; g.textAlign = "left";
   g.fillText(`${T().label}   ·   V = ${V()}${S.cat ? "   ·   catalyst" : ""}`, BX + 6, BY + BH + 14);
-  if (S.paused) { g.fillStyle = "rgba(15,23,42,.6)"; g.font = "bold 16px Arial"; g.fillText("Paused", BX + 8, BY + 22); }
+  if (!S.started) {
+    const cx = BX + S.wpx / 2, cy = BY + BH / 2;
+    g.fillStyle = "rgba(255,255,255,.9)"; g.strokeStyle = "#1d4ed8"; g.lineWidth = 2;
+    g.beginPath(); g.roundRect(cx - 105, cy - 24, 210, 48, 10); g.fill(); g.stroke();
+    g.fillStyle = "#1d4ed8"; g.font = "bold 17px Arial"; g.textAlign = "center"; g.fillText("▶ Press Start", cx, cy + 6); g.textAlign = "left";
+  } else if (S.paused) { g.fillStyle = "rgba(15,23,42,.6)"; g.font = "bold 16px Arial"; g.fillText("Paused", BX + 8, BY + 22); }
 }
 function niceMax(v) { const steps = [10, 20, 30, 40, 50, 60, 80, 100, 120, 150, 200, 250, 300, 400]; for (const s of steps) if (v <= s) return s; return Math.ceil(v / 100) * 100; }
 function drawGraph() {
@@ -246,7 +251,7 @@ function drawGraph() {
 let rmax = 1;
 function drawPanel() {
   const k = K(), qs = Math.max(Q(), 1e-6), lr = Math.log10(qs / k);
-  $("qk").textContent = `Q = ${fmt(qs)}, K = ${fmt(k)}`;
+  $("qk").textContent = `Q = ${Q() < 1e-5 ? "0" : fmt(qs)}, K = ${fmt(k)}`;
   $("qpt").style.left = (50 + Math.max(-1, Math.min(1, lr)) * 48) + "%";
   const f = rateF(), r = rateR(); rmax = Math.max(rmax * 0.995, f, r, 0.5);
   $("rf").style.width = (f / rmax * 100).toFixed(1) + "%"; $("rr").style.width = (r / rmax * 100).toFixed(1) + "%";
@@ -256,7 +261,8 @@ function drawPanel() {
   let msg, eqm = false;
   // hysteresis: random fluctuations should not flip the status back and forth
   S.eqm = S.eqm ? Math.abs(lr) < 0.03 : Math.abs(lr) < 0.015;
-  if (S.eqm) { eqm = true; msg = "<b>At equilibrium:</b> Q ≈ K and the forward rate ≈ the reverse rate. Both reactions are still happening (watch the flashes), so the amounts stay steady: this is a <b>dynamic</b> equilibrium."; }
+  if (!S.started) msg = "<b>Not started:</b> there is no N₂O₄ yet, so Q = 0 and Q &lt; K. When you press <b>Start</b>, the forward reaction will run.";
+  else if (S.eqm) { eqm = true; msg = "<b>At equilibrium:</b> Q ≈ K and the forward rate ≈ the reverse rate. Both reactions are still happening (watch the flashes), so the amounts stay steady: this is a <b>dynamic</b> equilibrium."; }
   else if (lr < 0) msg = "<b>Q &lt; K:</b> the forward rate is bigger than the reverse rate, so there is a <b>net forward</b> reaction (→): NO₂ is being used up and N₂O₄ is forming.";
   else msg = "<b>Q &gt; K:</b> the reverse rate is bigger than the forward rate, so there is a <b>net reverse</b> reaction (←): N₂O₄ is breaking apart into NO₂.";
   st.innerHTML = msg; st.classList.toggle("eqm", eqm);
@@ -312,7 +318,7 @@ function request(key, ti) {
     const name = {left: "shift left", right: "shift right", none: "no shift"};
     p.innerHTML = `<p class="${ok ? "fb-ok" : "fb-x"}"><b>${ok ? "Correct" : "Not quite"}: ${name[ans]}.</b> ${ok ? "" : `You said ${name[guess]}.`} Now watch it happen.</p>`;
     apply(key, ti); $("why").innerHTML = ACT[key].why;
-    S.paused = false; $("b-pause").textContent = "❚❚ Pause";
+    run(true);
     S.pending = {at: S.t + 6, done: () => { p.hidden = true; }};
   };
 }
@@ -321,19 +327,19 @@ function updateButtons() {
   for (const b of document.querySelectorAll("button[data-t]")) b.classList.toggle("on", +b.dataset.t === S.ti);
 }
 function reset() {
-  Object.assign(S, {eqm: false, nA: 120, nB: 0, nAr: 0, vi: 1, ti: 1, cat: false, t: 0, paused: false, parts: [], hist: [], marks: [], qs: null, wpx: wTarget(), pending: null});
-  S.wpx = WFULL / 2; S.qs = Math.log(Math.max(Q(), 1e-6)); syncParticles(); $("why").innerHTML = "Start: only NO₂ in the box. Watch it react until it reaches equilibrium, then change something.";
-  $("pred").hidden = true; $("b-cat").textContent = "Add catalyst"; $("b-pause").textContent = "❚❚ Pause"; $("lg-ar").hidden = true;
+  Object.assign(S, {started: false, eqm: false, nA: 120, nB: 0, nAr: 0, vi: 1, ti: 1, cat: false, t: 0, paused: true, parts: [], hist: [], marks: [], qs: null, wpx: wTarget(), pending: null});
+  S.wpx = WFULL / 2; S.qs = Math.log(Math.max(Q(), 1e-6)); syncParticles(); $("why").innerHTML = "Only NO₂ in the box. Press <b>▶ Start</b> and watch it react until it reaches equilibrium, then change something.";
+  $("pred").hidden = true; $("b-cat").textContent = "Add catalyst"; $("b-pause").textContent = "▶ Start"; $("b-pause").classList.add("on"); $("lg-ar").hidden = true;
   mark("start"); updateButtons();
 }
 
 // ---------------------------------------------------------------- first-visit tour
 const TOUR = [
   ["#box", "The container. Brown <b>NO₂</b> particles join in pairs to make colorless <b>N₂O₄</b> (two joined circles), and N₂O₄ breaks apart again. Each yellow flash is a reaction. The more NO₂ there is, the browner the gas."],
-  ["#graph", "The concentrations over time. At first there is only NO₂; watch the two lines level off. Every change you make is marked with a dashed line."],
+  ["#graph", "The concentrations over time. At first there is only NO₂: after you press <b>Start</b>, watch the two lines level off. Every change you make is marked with a dashed line."],
   ["#qk-wrap", "<b>Q compared with K.</b> When the arrow is on the K line, the system is at equilibrium. Left of K means Q &lt; K: the reaction runs forward. Right of K means Q &gt; K: it runs in reverse."],
   ["#rates", "The forward and reverse rates. At equilibrium they are equal but not zero: both reactions keep happening, so the amounts stay steady."],
-  ["#ctl", "Once it reaches equilibrium, disturb it: add or remove a gas, heat or cool it, compress or expand it, add a catalyst or argon. <b>Start over</b> resets the box."],
+  ["#ctl", "Press <b>▶ Start</b> to begin. Once it reaches equilibrium, disturb it: add or remove a gas, heat or cool it, compress or expand it, add a catalyst or argon. <b>Start over</b> resets the box."],
   ["#status", "This line tells you what the reaction is doing right now. After each change, the reason for the shift appears just below it."],
   ["#predict-lbl", () => $("predict").checked ? "<b>Predict first</b> is on: before each change you choose left, right or no shift, then watch whether you were right." : "Turn on <b>Predict first</b> to choose left, right or no shift before each change, then watch whether you were right."]
 ];
@@ -393,7 +399,12 @@ document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els
 // ---------------------------------------------------------------- wiring
 for (const b of document.querySelectorAll("button[data-a]")) b.onclick = () => request(b.dataset.a);
 for (const b of document.querySelectorAll("button[data-t]")) b.onclick = () => { const ti = +b.dataset.t; if (ti !== S.ti) request(ti > S.ti ? "heat" : "cool", ti); };
-$("b-pause").onclick = () => { if (!$("pred").hidden && S.paused) return; S.paused = !S.paused; $("b-pause").textContent = S.paused ? "▶ Run" : "❚❚ Pause"; };
+function run(on) {
+  S.paused = !on; if (on) S.started = true;
+  $("b-pause").textContent = on ? "❚❚ Pause" : "▶ Run"; $("b-pause").classList.toggle("on", !on);
+}
+$("b-pause").onclick = () => { if (!$("pred").hidden && S.paused) return; run(S.paused); };
+box.addEventListener("click", () => { if (!S.started && $("pred").hidden) run(true); });
 $("b-reset").onclick = reset;
 let last = performance.now();
 function frame(now) {
