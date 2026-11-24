@@ -8,7 +8,7 @@ Embeds interactive chemistry simulations anywhere Moodle shows formatted text
     [chemsim pes mode=identify tabs=0]
     [chemsim equilibrium predict=1]
 
-The PES builder shows a short guided tour the first time a student opens each tab
+Both simulations show a short guided tour the first time a student opens them (PES: each tab)
 (remembered in that browser; the ? button replays it).
 
 The simulations are self-contained HTML files in `sims/` (no external scripts,
@@ -20,7 +20,7 @@ resizes itself to fit; an "Open full screen" link opens it on its own.
 | Name | What it is | Options |
 |---|---|---|
 | `pes` | Photoelectron spectroscopy: explore, how PES works, build a spectrum, identify the element (H–Ca, plus Sc, Fe, Zn, Fe²⁺) | `mode` = explore / measure / build / identify; `el` = element symbol (`Fe2+` for the ion); `compare` = element, `prev`, `next` or `none`; `tabs=0` hides the tabs; `tour=0` stops the first-visit tour from starting by itself (the ? button still shows it) |
-| `equilibrium` | 2 NO₂ ⇌ N₂O₄ particle box: Le Chatelier changes, Q vs K, forward/reverse rates | `predict=1` turns on "predict first"; `title=0` hides the heading |
+| `equilibrium` | 2 NO₂ ⇌ N₂O₄ particle box: Le Chatelier changes, Q vs K, forward/reverse rates | `predict=1` turns on "predict first"; `title=0` hides the heading; `tour=0` stops the first-visit tour starting by itself |
 
 Every shortcode also accepts `height=` (pixels) for the starting frame height.
 Options a simulation doesn't know are dropped, and unknown simulation names are
