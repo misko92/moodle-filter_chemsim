@@ -93,12 +93,32 @@ class text_filter extends \core_filters\text_filter {
             'allow' => 'fullscreen',
             'style' => "width:100%;height:{$height}px;border:0;display:block",
         ]);
+        // Full screen opens in the same tab; the simulation shows a "Back to Moodle" bar
+        // that returns to the page the shortcode was on.
+        $fullurl = new \moodle_url($url);
+        $back = $this->back_url();
+        if ($back) {
+            $fullurl->param('back', $back);
+        }
         $link = \html_writer::link(
-            $url,
+            $fullurl,
             get_string('openfull', 'filter_chemsim'),
-            ['target' => '_blank', 'class' => 'filter-chemsim-open small']
+            ['class' => 'filter-chemsim-open small']
         );
         return \html_writer::div($html . $link, 'filter-chemsim') . $this->resize_script();
+    }
+
+    /**
+     * The URL of the page being shown, for the "Back to Moodle" bar in full-screen view.
+     *
+     * @return string|null
+     */
+    private function back_url(): ?string {
+        global $PAGE;
+        if (!empty($PAGE) && $PAGE->has_set_url()) {
+            return $PAGE->url->out(false);
+        }
+        return null;
     }
 
     /**

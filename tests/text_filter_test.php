@@ -83,6 +83,16 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertStringNotContainsString('<iframe', $out);
     }
 
+    public function test_full_screen_link_returns_to_page(): void {
+        global $PAGE;
+        $PAGE->set_url(new \moodle_url('/mod/page/view.php', ['id' => 42]));
+        $out = $this->run_filter('[chemsim pes]');
+        $this->assertMatchesRegularExpression('~<a href="[^"]*pes\.html\?v=[^"]*back=[^"]*mod%2Fpage%2Fview\.php[^"]*"~', $out);
+        $this->assertStringNotContainsString('target="_blank"', $out);
+        // The frame itself never carries the back link.
+        $this->assertMatchesRegularExpression('~<iframe[^>]*src="[^"]*pes\.html\?v=\d+"~', $out);
+    }
+
     public function test_text_without_shortcode_unchanged(): void {
         $text = '<p>No simulations here [chem] at all.</p>';
         $this->assertSame($text, $this->run_filter($text));
