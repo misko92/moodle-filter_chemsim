@@ -93,8 +93,11 @@ class text_filter extends \core_filters\text_filter {
             'allow' => 'fullscreen',
             'style' => "width:100%;height:{$height}px;border:0;display:block",
         ]);
-        $link = \html_writer::link($url, get_string('openfull', 'filter_chemsim'),
-            ['target' => '_blank', 'class' => 'filter-chemsim-open small']);
+        $link = \html_writer::link(
+            $url,
+            get_string('openfull', 'filter_chemsim'),
+            ['target' => '_blank', 'class' => 'filter-chemsim-open small']
+        );
         return \html_writer::div($html . $link, 'filter-chemsim') . $this->resize_script();
     }
 
