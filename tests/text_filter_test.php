@@ -87,7 +87,10 @@ final class text_filter_test extends \advanced_testcase {
         global $PAGE;
         $PAGE->set_url(new \moodle_url('/mod/page/view.php', ['id' => 42]));
         $out = $this->run_filter('[chemsim pes]');
-        $this->assertMatchesRegularExpression('~<a [^>]*href="[^"]*pes\.html\?v=[^"]*back=[^"]*mod%2Fpage%2Fview\.php[^"]*"~', $out);
+        $this->assertMatchesRegularExpression(
+            '~<a [^>]*href="[^"]*pes\.html\?v=[^"]*back=[^"]*mod%2Fpage%2Fview\.php[^"]*"~',
+            $out
+        );
         $this->assertStringNotContainsString('target="_blank"', $out);
         // The frame itself never carries the back link.
         $this->assertMatchesRegularExpression('~<iframe[^>]*src="[^"]*pes\.html\?v=\d+"~', $out);
