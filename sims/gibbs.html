@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gibbs Free Energy</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+select, input[type=text] { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; max-width: 100%; }
+input[type=text] { width: 7em; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type=range] { flex: 1 1 160px; height: 32px; min-width: 140px; }
+.val { font-weight: bold; min-width: 6.5em; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 15px; line-height: 1.6; margin-top: 8px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.ok { color: #047857; } .bad { color: #b91c1c; }
+.mode { display: none; } .mode.active { display: block; }
+table.cases { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+table.cases td, table.cases th { border: 1px solid var(--line); padding: 5px 6px; text-align: center; }
+table.cases th { background: #f1f5f9; font-weight: normal; color: var(--muted); }
+table.cases td.hl { background: #fef3c7; font-weight: bold; outline: 2px solid #f59e0b; }
+.opts button { margin: 4px 6px 0 0; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Gibbs Free Energy: ΔG° = ΔH° − TΔS°</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="explore">Explore</button>
+  <button data-mode="practice">Practice</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 460px" id="boxcard">
+    <section class="mode" id="m-explore">
+      <canvas id="bars" width="520" height="280" aria-label="Bars showing the enthalpy term, the entropy term and their sum, ΔG"></canvas>
+      <div class="ctl" id="ctl">
+        <b>Reaction</b>
+        <div><select id="rx"></select></div>
+        <b class="cu">ΔH°</b>
+        <div class="cu"><input type="range" id="dh" min="-250" max="250" step="5" value="-50"><span class="val" id="dhv"></span></div>
+        <b class="cu">ΔS°</b>
+        <div class="cu"><input type="range" id="ds" min="-300" max="300" step="5" value="-100"><span class="val" id="dsv"></span></div>
+        <b>Temperature</b>
+        <div><input type="range" id="temp" min="0" max="1500" step="5" value="298"><span class="val" id="tempv"></span><button id="b-298">298 K</button></div>
+      </div>
+      <table class="cases" id="cases"></table>
+    </section>
+    <section class="mode" id="m-practice">
+      <h2>Is this reaction thermodynamically favored?</h2>
+      <div class="big" id="pq"></div>
+      <div class="opts" id="popts"></div>
+      <div class="ctl" id="pt" style="display:none">
+        <b>Crossover temperature</b>
+        <div><input type="text" id="q-t" inputmode="decimal" placeholder="T"> K <button id="b-check" class="primary">Check</button></div>
+      </div>
+      <div class="why" id="pfb" style="display:none"></div>
+      <div style="margin-top:10px"><button id="b-new">New reaction</button></div>
+    </section>
+  </div>
+
+  <div class="card" style="flex:1 1 500px" id="graphcard">
+    <h2>ΔG° vs temperature</h2>
+    <canvas id="graph" width="520" height="300" aria-label="Graph of ΔG against temperature"></canvas>
+    <div class="legend"><span style="color:#047857">■ ΔG° &lt; 0: thermodynamically favored</span><span style="color:#b91c1c">■ ΔG° &gt; 0: not favored</span></div>
+    <div class="big" id="readout"></div>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note">ΔH° and ΔS° are treated as constant with temperature (a good approximation over moderate ranges). Values are from standard thermodynamic tables at 298 K.</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const RX = {
+  caco3: {f: "CaCO₃(s) → CaO(s) + CO₂(g)", dH: 178.3, dS: 160.6},
+  nh3: {f: "N₂(g) + 3 H₂(g) → 2 NH₃(g)", dH: -92.2, dS: -198.7},
+  h2o2: {f: "2 H₂O₂(l) → 2 H₂O(l) + O₂(g)", dH: -196.0, dS: 125.9},
+  o3: {f: "3 O₂(g) → 2 O₃(g)", dH: 285.4, dS: -137.6},
+  melt: {f: "H₂O(s) → H₂O(l)", dH: 6.01, dS: 22.0},
+  custom: {f: "Your own reaction (choose ΔH° and ΔS°)", dH: -50, dS: -100}
+};
+const S = {mode: "explore", rx: "nh3", T: 298, dH: -92.2, dS: -198.7, p: null};
+const dG = (T, dH = S.dH, dS = S.dS) => dH - T * dS / 1000;
+const Tx = (dH = S.dH, dS = S.dS) => dS !== 0 ? dH * 1000 / dS : Infinity;   // where ΔG = 0
+const caseOf = (dH, dS) => dH < 0 && dS > 0 ? "always" : dH > 0 && dS < 0 ? "never" : dH < 0 ? "low" : "high";
+const CASES = {always: "at all temperatures", never: "at no temperature", low: "only at low temperatures (below the crossover)", high: "only at high temperatures (above the crossover)"};
+function fmtK(dGv, T) {
+  if (T <= 0) return "—";
+  const lnK = -dGv * 1000 / (8.314 * T), log = lnK / Math.LN10;
+  if (Math.abs(log) < 3) return Math.exp(lnK).toPrecision(3);
+  const e = Math.floor(log), m = Math.pow(10, log - e); return `${m.toFixed(1)}×10<sup>${e}</sup>`;
+}
+// ---------------------------------------------------------------- drawing
+const bars = $("bars"), bg = bars.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(bars, 520, 280); hiDPI(graph, 520, 300);
+function niceMax(v) { for (const s of [50, 100, 150, 200, 250, 300, 400, 500, 600, 800]) if (v <= s) return s; return Math.ceil(v / 200) * 200; }
+function drawBars() {
+  const g = bg; g.clearRect(0, 0, 520, 280);
+  const h = S.dH, ts = -S.T * S.dS / 1000, d = h + ts, M = niceMax(Math.max(Math.abs(h), Math.abs(ts), Math.abs(d)) * 1.1);
+  const y0 = 140, Y = v => y0 - v / M * 115;
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (const v of [-M, -M / 2, 0, M / 2, M]) { g.beginPath(); g.moveTo(70, Y(v)); g.lineTo(505, Y(v)); g.stroke(); g.fillText(Math.round(v), 64, Y(v) + 4); }
+  g.strokeStyle = "#475569"; g.lineWidth = 2; g.beginPath(); g.moveTo(70, y0); g.lineTo(505, y0); g.stroke();
+  g.save(); g.translate(14, y0); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText("kJ/mol", 0, 0); g.restore();
+  const items = [["ΔH°", h, "#f97316", "enthalpy term"], ["−TΔS°", ts, "#8b5cf6", "entropy term"], ["ΔG°", d, d < 0 ? "#059669" : "#dc2626", d < 0 ? "favored" : "not favored"]];
+  items.forEach(([lbl, v, col, sub], i) => {
+    const x = 110 + i * 135, w = 80; g.fillStyle = col; g.globalAlpha = i === 2 ? 1 : 0.8; g.fillRect(x, Math.min(Y(v), y0), w, Math.abs(Y(v) - y0)); g.globalAlpha = 1;
+    g.fillStyle = "#1f2937"; g.font = "bold 14px Arial"; g.textAlign = "center"; g.fillText(lbl, x + w / 2, 270 - 12);
+    g.font = "11px Arial"; g.fillStyle = "#6b7280"; g.fillText(sub, x + w / 2, 274);
+    g.font = "bold 13px Arial"; g.fillStyle = "#1f2937"; g.fillText((v >= 0 ? "+" : "−") + Math.abs(v).toFixed(1), x + w / 2, v >= 0 ? Y(v) - 6 : Y(v) + 16);
+    if (i < 2) { g.font = "bold 20px Arial"; g.fillStyle = "#475569"; g.fillText(i === 0 ? "+" : "=", x + w + 27, y0 - 8); }
+  });
+  g.fillStyle = "#1f2937"; g.font = "13px Arial"; g.textAlign = "left"; g.textAlign = "right"; g.fillText(`at T = ${S.T} K`, 505, 18);
+}
+const GX0 = 60, GX1 = 505, GY0 = 14, GY1 = 260, TM = 1500;
+function drawGraph() {
+  const g = gg; g.clearRect(0, 0, 520, 300);
+  const v0 = S.dH, v1 = dG(TM), M = niceMax(Math.max(Math.abs(v0), Math.abs(v1), 50) * 1.1);
+  const X = T => GX0 + T / TM * (GX1 - GX0), Y = v => (GY0 + GY1) / 2 - v / M * (GY1 - GY0) / 2;
+  g.fillStyle = "rgba(220,38,38,.07)"; g.fillRect(GX0, GY0, GX1 - GX0, Y(0) - GY0);
+  g.fillStyle = "rgba(5,150,105,.08)"; g.fillRect(GX0, Y(0), GX1 - GX0, GY1 - Y(0));
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let i = -2; i <= 2; i++) { const v = M * i / 2; g.beginPath(); g.moveTo(GX0, Y(v)); g.lineTo(GX1, Y(v)); g.stroke(); g.fillText(Math.round(v), GX0 - 5, Y(v) + 4); }
+  g.textAlign = "center"; for (let T = 0; T <= TM; T += 250) { g.beginPath(); g.moveTo(X(T), GY0); g.lineTo(X(T), GY1); g.stroke(); g.fillText(T, X(T), GY1 + 15); }
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, GY0); g.lineTo(GX0, GY1); g.lineTo(GX1, GY1); g.stroke();
+  g.strokeStyle = "#1f2937"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, Y(0)); g.lineTo(GX1, Y(0)); g.stroke();
+  g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText("Temperature (K)", (GX0 + GX1) / 2, GY1 + 34);
+  g.save(); g.translate(14, (GY0 + GY1) / 2); g.rotate(-Math.PI / 2); g.fillText("ΔG° (kJ/mol)", 0, 0); g.restore();
+  g.fillStyle = "#b91c1c"; g.font = "11px Arial"; g.textAlign = "right"; g.fillText("not favored", GX1 - 4, GY0 + 12);
+  g.fillStyle = "#047857"; g.fillText("favored", GX1 - 4, GY1 - 6);
+  // line
+  g.save(); g.beginPath(); g.rect(GX0, GY0, GX1 - GX0, GY1 - GY0); g.clip();
+  g.strokeStyle = "#1d4ed8"; g.lineWidth = 3; g.beginPath(); g.moveTo(X(0), Y(dG(0))); g.lineTo(X(TM), Y(dG(TM))); g.stroke(); g.restore();
+  g.fillStyle = "#1d4ed8"; g.font = "11px Arial"; g.textAlign = "left"; g.fillText(`intercept = ΔH° = ${S.dH} kJ`, X(0) + 6, Math.max(GY0 + 10, Math.min(GY1 - 4, Y(S.dH) + (S.dH > 0 ? -6 : 14))));
+  const tx = Tx();
+  if (tx > 0 && tx < TM) { g.beginPath(); g.arc(X(tx), Y(0), 6, 0, 6.283); g.fillStyle = "#f59e0b"; g.fill(); g.fillStyle = "#92400e"; g.font = "bold 12px Arial"; g.textAlign = "center"; g.fillText(`ΔG° = 0 at ${Math.round(tx)} K`, X(tx), Y(0) + (S.dS > 0 ? 18 : -10)); }
+  const d = dG(S.T); g.beginPath(); g.arc(X(S.T), Y(d), 7, 0, 6.283); g.strokeStyle = "#dc2626"; g.lineWidth = 3; g.stroke();
+}
+function cases() {
+  const c = caseOf(S.dH, S.dS);
+  const cell = (k, txt) => `<td class="${k === c ? "hl" : ""}">${txt}</td>`;
+  $("cases").innerHTML = `<tr><th></th><th>ΔS° &gt; 0</th><th>ΔS° &lt; 0</th></tr>
+    <tr><th>ΔH° &lt; 0</th>${cell("always", "favored at all T")}${cell("low", "favored at low T")}</tr>
+    <tr><th>ΔH° &gt; 0</th>${cell("high", "favored at high T")}${cell("never", "never favored")}</tr>`;
+}
+function readout() {
+  const d = dG(S.T), tx = Tx();
+  $("readout").innerHTML = `ΔG° = ΔH° − TΔS° = ${S.dH} kJ − (${S.T} K)(${(S.dS / 1000).toFixed(4)} kJ/K) = <b style="color:${d < 0 ? "#047857" : "#b91c1c"}">${d.toFixed(1)} kJ/mol</b>` +
+    `<br>K = e<sup>−ΔG°/RT</sup> = <b>${fmtK(d, S.T)}</b>` + (tx > 0 && isFinite(tx) ? ` &nbsp; Crossover: T = ΔH°/ΔS° = <b>${Math.round(tx)} K</b>` : "");
+}
+function explain() {
+  const c = caseOf(S.dH, S.dS), d = dG(S.T), tx = Tx();
+  const T = {
+    always: "ΔH° &lt; 0 and ΔS° &gt; 0: <b>both</b> terms make ΔG° negative, so the reaction is thermodynamically favored at every temperature.",
+    never: "ΔH° &gt; 0 and ΔS° &lt; 0: <b>both</b> terms make ΔG° positive, so the reaction is not favored at any temperature (the reverse reaction is always favored).",
+    low: `ΔH° &lt; 0 helps, but ΔS° &lt; 0 hurts, and the entropy term −TΔS° grows with temperature. Below ${Math.round(tx)} K the enthalpy term wins (favored); above it the entropy term wins (not favored).`,
+    high: `ΔH° &gt; 0 hurts, but ΔS° &gt; 0 helps, and the entropy term −TΔS° grows with temperature. Above ${Math.round(tx)} K the entropy term wins and the reaction becomes favored.`
+  };
+  let s = T[c];
+  if (S.rx === "melt") s += " For ice melting, the crossover is the <b>melting point</b>: at 273 K solid and liquid are in equilibrium (ΔG° = 0).";
+  if (S.rx === "caco3") s += " This is why limestone is heated above about 1100 K in a lime kiln to make CaO.";
+  if (S.rx === "nh3") s += " The Haber process runs at about 700 K anyway, because at low temperature the reaction is far too slow: favored is not the same as fast.";
+  s += `<br><span style="color:var(--muted)">At ${S.T} K: ΔG° ${d < 0 ? "&lt; 0, K &gt; 1: products are favored" : d > 0 ? "&gt; 0, K &lt; 1: reactants are favored" : "= 0, K = 1"}.</span>`;
+  $("why").innerHTML = s;
+}
+function update() {
+  $("dhv").textContent = `${S.dH} kJ/mol`; $("dsv").textContent = `${S.dS} J/(mol·K)`; $("tempv").textContent = `${S.T} K`;
+  drawBars(); drawGraph(); cases(); readout(); explain();
+}
+// ---------------------------------------------------------------- controls
+$("rx").innerHTML = Object.keys(RX).map(k => `<option value="${k}">${RX[k].f}${k === "custom" ? "" : ` (ΔH° = ${RX[k].dH} kJ, ΔS° = ${RX[k].dS} J/K)`}</option>`).join("");
+function setRx(k) {
+  S.rx = k; S.dH = RX[k].dH; S.dS = RX[k].dS;
+  for (const e of document.querySelectorAll(".cu")) e.style.display = k === "custom" ? "" : "none";
+  if (k === "custom") { $("dh").value = S.dH; $("ds").value = S.dS; }
+  update();
+}
+$("rx").onchange = () => setRx($("rx").value);
+$("dh").addEventListener("input", e => { S.dH = +e.target.value; RX.custom.dH = S.dH; update(); });
+$("ds").addEventListener("input", e => { S.dS = +e.target.value; RX.custom.dS = S.dS; update(); });
+$("temp").addEventListener("input", e => { S.T = +e.target.value; update(); });
+$("b-298").onclick = () => { S.T = 298; $("temp").value = 298; update(); };
+// drag the temperature marker on the graph
+let drag = false;
+const gT = ev => { const r = graph.getBoundingClientRect(); return Math.max(0, Math.min(TM, Math.round(((ev.clientX - r.left) / r.width * 520 - GX0) / (GX1 - GX0) * TM / 5) * 5)); };
+graph.addEventListener("pointerdown", ev => { if (S.mode !== "explore") return; drag = true; graph.setPointerCapture(ev.pointerId); S.T = gT(ev); $("temp").value = S.T; update(); });
+graph.addEventListener("pointermove", ev => { if (!drag) return; S.T = gT(ev); $("temp").value = S.T; update(); });
+graph.addEventListener("pointerup", () => { drag = false; });
+// ---------------------------------------------------------------- practice
+function newProblem() {
+  const sH = Math.random() < 0.5 ? -1 : 1, sS = Math.random() < 0.5 ? -1 : 1;
+  let dH, dS; do { dH = sH * (20 + 5 * Math.floor(Math.random() * 37)); dS = sS * (40 + 5 * Math.floor(Math.random() * 43)); } while ((sH === sS) && (Math.abs(dH * 1000 / dS) < 150 || Math.abs(dH * 1000 / dS) > 1450));
+  S.p = {dH, dS, step: 1};
+  S.dH = dH; S.dS = dS; S.T = 298; $("temp").value = 298;
+  $("pq").innerHTML = `A reaction has <b>ΔH° = ${dH > 0 ? "+" : ""}${dH} kJ/mol</b> and <b>ΔS° = ${dS > 0 ? "+" : ""}${dS} J/(mol·K)</b>. When is it thermodynamically favored?`;
+  $("popts").innerHTML = Object.keys(CASES).map(k => `<button data-c="${k}">${CASES[k][0].toUpperCase() + CASES[k].slice(1)}</button>`).join("");
+  $("popts").querySelectorAll("button").forEach(b => b.onclick = () => answerCase(b.dataset.c));
+  $("pt").style.display = "none"; $("pfb").style.display = "none"; $("q-t").value = "";
+  $("why").innerHTML = "Look at the signs of ΔH° and ΔS°. Remember that ΔS° is in J/K: divide by 1000 before combining it with ΔH° in kJ.";
+  $("readout").innerHTML = ""; gg.clearRect(0, 0, 520, 300); hideGraph(true);
+}
+function hideGraph(h) { graph.style.visibility = h ? "hidden" : "visible"; }
+function answerCase(c) {
+  const p = S.p, right = caseOf(p.dH, p.dS), fb = $("pfb"); fb.style.display = "";
+  if (c !== right) { fb.innerHTML = `<span class="bad">✗ Not quite.</span> ΔH° is ${p.dH < 0 ? "negative (helps)" : "positive (hurts)"} and ΔS° is ${p.dS > 0 ? "positive, so −TΔS° is negative (helps)" : "negative, so −TΔS° is positive (hurts)"}. Try again.`; return; }
+  fb.innerHTML = `<span class="ok">✓ Correct: favored ${CASES[right]}.</span>` + (right === "low" || right === "high" ? " Now calculate the crossover temperature, where ΔG° = 0." : " There is no crossover temperature.");
+  if (right === "low" || right === "high") $("pt").style.display = ""; else reveal();
+}
+function reveal() { hideGraph(false); update(); }
+$("b-check").onclick = () => {
+  const p = S.p, t = Math.abs(p.dH * 1000 / p.dS), v = parseFloat($("q-t").value.replace(",", ".")), fb = $("pfb");
+  if (!isFinite(v)) return;
+  if (Math.abs(v - t) <= 0.02 * t) { fb.innerHTML = `<span class="ok">✓ Correct: T = ΔH°/ΔS° = ${p.dH * 1000} J / ${p.dS} J/K = ${Math.round(t)} K.</span> The graph shows the line crossing zero there.`; reveal(); }
+  else if (Math.abs(v - t / 1000) <= 0.02 * t / 1000 || Math.abs(v - t * 1000) <= 0.02 * t * 1000) fb.innerHTML = `<span class="bad">✗ Check your units:</span> ΔH° is in kJ and ΔS° in J/K. Convert one of them first.`;
+  else fb.innerHTML = `<span class="bad">✗ Not quite.</span> Set ΔG° = 0: 0 = ΔH° − TΔS°, so T = ΔH°/ΔS° (with both in the same energy unit).`;
+};
+$("b-new").onclick = newProblem;
+// ---------------------------------------------------------------- tabs
+function setMode(m) {
+  S.mode = m;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  if (m === "explore") { hideGraph(false); setRx(S.rx); } else newProblem();
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+// ---------------------------------------------------------------- tours
+const TOURS = {
+  explore: [
+    ["#bars", "ΔG° is the sum of two terms: the enthalpy term ΔH° and the entropy term −TΔS°. The entropy term grows as the temperature rises."],
+    ["#ctl", "Choose a reaction (or make your own) and change the temperature."],
+    ["#cases", "The four sign combinations. The one for this reaction is highlighted."],
+    ["#graphcard", "ΔG° against temperature is a straight line: intercept ΔH°, slope −ΔS°. Where it crosses zero, the reaction switches between favored and not favored. You can drag along the graph to change T."]
+  ],
+  practice: [
+    ["#m-practice", "Decide when the reaction is favored, then calculate the crossover temperature if there is one. The graph appears once you have answered."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-gibbs-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {explore: "Explore", practice: "Practice"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const r = q.get("reaction"); if (r && RX[r]) S.rx = r;
+  $("rx").value = S.rx;
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "practice" ? "practice" : "explore");
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Titrations and Buffers</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; max-width: 100%; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type=range] { flex: 1 1 160px; height: 32px; min-width: 140px; }
+.val { font-weight: bold; min-width: 5.5em; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+table.stats { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+table.stats td, table.stats th { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+table.stats th { font-size: 12px; color: var(--muted); font-weight: normal; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 15px; line-height: 1.5; margin-top: 8px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Titrations and Buffers</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="titration">Titration</button>
+  <button data-mode="buffer">Buffers</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 460px" id="boxcard">
+    <canvas id="box" width="520" height="360" aria-label="Beaker with particles of the species in solution"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="ctl" id="ctl">
+      <b class="ti">Analyte</b>
+      <div class="ti"><select id="ana"></select></div>
+      <b class="ti">Indicator</b>
+      <div class="ti"><select id="ind"></select></div>
+      <b class="ti">Add titrant</b>
+      <div class="ti"><button data-add="0.1">+0.1 mL</button><button data-add="1">+1 mL</button><button data-add="5">+5 mL</button><button id="b-drip">▶ Drip</button></div>
+      <b class="bu">Buffer pair</b>
+      <div class="bu"><select id="pair"></select></div>
+      <b class="bu" id="hal">[HA]</b>
+      <div class="bu"><input type="range" id="cha" min="0.02" max="0.2" step="0.02" value="0.1"><span class="val" id="chav"></span></div>
+      <b class="bu" id="al">[A⁻]</b>
+      <div class="bu"><input type="range" id="ca" min="0.02" max="0.2" step="0.02" value="0.1"><span class="val" id="cav"></span></div>
+      <b class="bu">Add to both</b>
+      <div class="bu"><button id="b-acid">+1 mL 1.0 M HCl</button><button id="b-base">+1 mL 1.0 M NaOH</button></div>
+      <b></b>
+      <div><button id="b-reset">↺ Start over</button><label class="chk ti"><input type="checkbox" id="keys" checked> Show key points</label></div>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1 1 500px" id="graphcard">
+    <h2 id="gtitle"></h2>
+    <canvas id="graph" width="520" height="320" aria-label="pH curve"></canvas>
+    <div class="legend" id="glegend"></div>
+    <div class="big" id="readout"></div>
+    <table class="stats" id="table"></table>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note" id="foot"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const Kw = 1e-14;
+// ---------------------------------------------------------------- chemistry: one exact solver for every case
+// Every solution here is "a weak acid HA (total CT, Ka) plus a net amount b of strong base" (b < 0 means strong acid).
+// Charge balance: [H3O+] + b = [OH-] + CT·Ka/(Ka + [H3O+])
+function solveH(CT, Ka, b) {
+  let lo = -15, hi = 1;
+  for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2, H = Math.pow(10, m), f = H + b - Kw / H - CT * Ka / (Ka + H); if (f > 0) hi = m; else lo = m; }
+  return Math.pow(10, (lo + hi) / 2);
+}
+const ANA = {
+  HCl: {lbl: "0.100 M HCl (strong acid)", Ka: 1e8, base: false, HA: "HCl", A: "Cl⁻", strong: true},
+  CH3COOH: {lbl: "0.100 M CH₃COOH (weak acid, Ka = 1.8×10⁻⁵)", Ka: 1.8e-5, base: false, HA: "CH₃COOH", A: "CH₃COO⁻"},
+  HCN: {lbl: "0.100 M HCN (very weak acid, Ka = 6.2×10⁻¹⁰)", Ka: 6.2e-10, base: false, HA: "HCN", A: "CN⁻"},
+  NH3: {lbl: "0.100 M NH₃ (weak base, Kb = 1.8×10⁻⁵)", Ka: 5.6e-10, base: true, HA: "NH₄⁺", A: "NH₃"}
+};
+const IND = {
+  none: {lbl: "none"},
+  phth: {lbl: "phenolphthalein (8.2–10.0)", lo: 8.2, hi: 10.0, c1: [255, 255, 255, 0], c2: [236, 72, 153, 0.75], n1: "colorless", n2: "pink"},
+  btb: {lbl: "bromothymol blue (6.0–7.6)", lo: 6.0, hi: 7.6, c1: [234, 179, 8, 0.6], c2: [37, 99, 235, 0.6], n1: "yellow", n2: "blue"},
+  mr: {lbl: "methyl red (4.4–6.2)", lo: 4.4, hi: 6.2, c1: [239, 68, 68, 0.6], c2: [234, 179, 8, 0.6], n1: "red", n2: "yellow"}
+};
+const PAIRS = {
+  acetate: {lbl: "CH₃COOH / CH₃COO⁻ (pKa 4.74)", Ka: 1.8e-5, HA: "CH₃COOH", A: "CH₃COO⁻"},
+  phosphate: {lbl: "H₂PO₄⁻ / HPO₄²⁻ (pKa 7.21)", Ka: 6.2e-8, HA: "H₂PO₄⁻", A: "HPO₄²⁻"},
+  ammonium: {lbl: "NH₄⁺ / NH₃ (pKa 9.25)", Ka: 5.6e-10, HA: "NH₄⁺", A: "NH₃"}
+};
+const CA = 0.100, VA = 25.0, CB = 0.100, VMAX = 50;   // analyte and titrant
+const S = {mode: "titration", ana: "CH3COOH", ind: "phth", vb: 0, drip: false, keys: true, curve: [],
+  pair: "acetate", cHA: 0.1, cA: 0.1, nH: 0, nOH: 0, bpts: [], parts: {}, fx: []};
+// titration state (mmol and mL; mmol/mL = M)
+function tState(vb) {
+  const a = ANA[S.ana], V = VA + vb, n0 = CA * VA, nt = CB * vb;
+  const CT = n0 / V, b = a.base ? (n0 - nt) / V : nt / V;
+  const H = solveH(CT, a.Ka, b), fA = a.Ka / (a.Ka + H);
+  return {V, H, pH: -Math.log10(H), nHA: n0 * (1 - fA), nA: n0 * fA, nH3O: H * V, nOH: Kw / H * V, n0, nt};
+}
+const veq = () => CA * VA / CB;
+// buffer state: buffer beaker and plain-water beaker, each 100 mL to start
+function bState() {
+  const p = PAIRS[S.pair], V = 100 + S.nH / 1.0 + S.nOH / 1.0;   // 1.0 M additions: 1 mmol per mL
+  const nHA0 = S.cHA * 100, nA0 = S.cA * 100, CT = (nHA0 + nA0) / V, b = (nA0 + S.nOH - S.nH) / V;
+  const H = solveH(CT, p.Ka, b), fA = p.Ka / (p.Ka + H);
+  const Hw = solveH(0, 1, (S.nOH - S.nH) / V);
+  return {V, H, pH: -Math.log10(H), nHA: (nHA0 + nA0) * (1 - fA), nA: (nHA0 + nA0) * fA, nH3O: H * V, nOHf: Kw / H * V,
+    pHw: -Math.log10(Hw), wH3O: Hw * V, wOH: Kw / Hw * V};
+}
+const fmtp = v => v.toFixed(2);
+function fmtc(v) { if (v === 0) return "0"; if (v >= 0.01) return (+v.toPrecision(3)).toString(); const e = Math.floor(Math.log10(v)), m = v / Math.pow(10, e); return `${m.toFixed(1)}×10<sup>${e}</sup>`; }
+
+// ---------------------------------------------------------------- particles (each one stands for a fixed amount)
+const W = 520, H = 360;
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function newP(type, reg, fromTop) { return {type, reg, x: rnd(reg.x0 + 10, reg.x1 - 10), y: fromTop ? reg.y0() + 8 : rnd(reg.y0() + 10, reg.y1 - 10), vx: rnd(-20, 20), vy: rnd(-20, 20), fl: fromTop ? 1 : 0}; }
+// make the particles in one region match the wanted counts: convert HA <-> A first (that is the reaction), then add or remove
+function reconcile(key, reg, want, spread) {
+  const ps = S.parts[key] || (S.parts[key] = []);
+  const have = t => ps.filter(p => p.type === t).length;
+  const conv = (from, to) => { const c = ps.filter(p => p.type === from); const p = c[Math.floor(Math.random() * c.length)]; p.type = to; p.fl = 1; if (S.fx.length < 30) S.fx.push({x: p.x, y: p.y, t: 1}); };
+  let dHA = (want.HA || 0) - have("HA"), dA = (want.A || 0) - have("A");
+  while (dHA > 0 && dA < 0) { conv("A", "HA"); dHA--; dA++; }
+  while (dHA < 0 && dA > 0) { conv("HA", "A"); dHA++; dA--; }
+  for (const t of ["HA", "A", "H3O", "OH"]) {
+    let d = (want[t] || 0) - have(t);
+    while (d > 0) { ps.push(newP(t, reg, !spread)); d--; }
+    while (d < 0) { const i = ps.findIndex(p => p.type === t); ps.splice(i, 1); d++; }
+  }
+  for (const p of ps) p.reg = reg;
+}
+const cnt = (n, unit) => { const v = n / unit; return v < 0.25 ? 0 : Math.max(1, Math.round(v)); };
+function moveParts(dt) {
+  for (const key in S.parts) for (const p of S.parts[key]) {
+    const r = p.reg, y0 = r.y0() + 8;
+    p.vx += rnd(-60, 60) * dt; p.vy += rnd(-60, 60) * dt; const sp = Math.hypot(p.vx, p.vy); if (sp > 30) { p.vx *= 30 / sp; p.vy *= 30 / sp; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.x < r.x0 + 9) { p.x = r.x0 + 9; p.vx = Math.abs(p.vx); } if (p.x > r.x1 - 9) { p.x = r.x1 - 9; p.vx = -Math.abs(p.vx); }
+    if (p.y < y0) { p.y = y0; p.vy = Math.abs(p.vy); } if (p.y > r.y1 - 9) { p.y = r.y1 - 9; p.vy = -Math.abs(p.vy); }
+    if (p.fl) p.fl = Math.max(0, p.fl - dt * 1.2);
+  }
+  for (const f of S.fx) f.t -= dt * 2; S.fx = S.fx.filter(f => f.t > 0);
+}
+const COL = {HA: "#1d4ed8", A: "#60a5fa", H3O: "#dc2626", OH: "#16a34a"};
+function drawP(g, p) {
+  const r = p.type === "HA" || p.type === "A" ? 7 : 5.5;
+  if (p.fl) { g.beginPath(); g.arc(p.x, p.y, r + 7 * p.fl, 0, 6.283); g.fillStyle = `rgba(250,204,21,${0.5 * p.fl})`; g.fill(); }
+  g.beginPath(); g.arc(p.x, p.y, r, 0, 6.283); g.fillStyle = COL[p.type]; g.fill();
+  if (p.type === "HA") { g.beginPath(); g.arc(p.x + 6, p.y - 5, 3.2, 0, 6.283); g.fillStyle = "#fff"; g.fill(); g.strokeStyle = "#1d4ed8"; g.lineWidth = 1; g.stroke(); }
+  g.fillStyle = "#fff"; g.font = "bold 10px Arial"; g.textAlign = "center";
+  if (p.type === "H3O") g.fillText("+", p.x, p.y + 3.5); if (p.type === "OH") g.fillText("−", p.x, p.y + 3.5);
+}
+function indColour(pH) {
+  const d = IND[S.ind]; if (!d.lo) return "rgba(219,234,254,0.55)";
+  const f = Math.max(0, Math.min(1, (pH - d.lo) / (d.hi - d.lo))), c = d.c1.map((v, i) => v + (d.c2[i] - v) * f);
+  return `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${Math.max(0.12, c[3]).toFixed(2)})`;
+}
+function beaker(g, x0, x1, ytop, ybot, liquidTop, fill, label) {
+  g.fillStyle = fill; g.fillRect(x0, liquidTop, x1 - x0, ybot - liquidTop);
+  g.strokeStyle = "#475569"; g.lineWidth = 3; g.beginPath(); g.moveTo(x0 - 6, ytop - 4); g.lineTo(x0, ytop); g.lineTo(x0, ybot); g.lineTo(x1, ybot); g.lineTo(x1, ytop); g.lineTo(x1 + 6, ytop - 4); g.stroke();
+  if (label) { g.fillStyle = "#334155"; g.font = "bold 13px Arial"; g.textAlign = "center"; g.fillText(label, (x0 + x1) / 2, ybot + 18); }
+}
+
+// ---------------------------------------------------------------- titration tab
+const TB = {x0: 165, x1: 415, y1: 330, top: 150};
+TB.y0 = () => TB.y1 - (TB.y1 - TB.top - 10) * (VA + S.vb) / (VA + VMAX);
+let dripFx = [];
+function drawTitration() {
+  const g = bg, st = tState(S.vb), a = ANA[S.ana];
+  g.clearRect(0, 0, W, H);
+  // burette
+  const bx = 290, level = 18 + 102 * S.vb / VMAX;
+  g.fillStyle = "#e0f2fe"; g.fillRect(bx - 9, level, 18, 120 - level); g.strokeStyle = "#475569"; g.lineWidth = 2; g.strokeRect(bx - 9, 14, 18, 106);
+  g.fillStyle = "#64748b"; g.fillRect(bx - 3, 120, 6, 16); g.fillRect(bx - 12, 124, 24, 5);
+  for (let v = 0; v <= 50; v += 10) { const y = 18 + 102 * v / VMAX; g.beginPath(); g.moveTo(bx + 9, y); g.lineTo(bx + 15, y); g.stroke(); g.fillStyle = "#6b7280"; g.font = "10px Arial"; g.textAlign = "left"; g.fillText(v, bx + 18, y + 3); }
+  g.fillStyle = "#334155"; g.font = "bold 12px Arial"; g.textAlign = "right"; g.fillText(`${CB.toFixed(3)} M ${a.base ? "HCl" : "NaOH"}`, bx - 16, 30);
+  for (const d of dripFx) { g.beginPath(); g.ellipse(bx, d.y, 3, 4.5, 0, 0, 6.283); g.fillStyle = "#38bdf8"; g.fill(); }
+  // beaker
+  beaker(g, TB.x0, TB.x1, TB.top, TB.y1, TB.y0(), indColour(st.pH), "");
+  for (const p of S.parts.t || []) drawP(g, p);
+  for (const f of S.fx) { g.beginPath(); g.arc(f.x, f.y, 6 + 10 * (1 - f.t), 0, 6.283); g.strokeStyle = `rgba(234,179,8,${f.t})`; g.lineWidth = 2; g.stroke(); }
+  // readouts
+  g.fillStyle = "#1f2937"; g.font = "bold 18px Arial"; g.textAlign = "left"; g.fillText(`pH ${fmtp(st.pH)}`, 12, 190);
+  g.font = "13px Arial"; g.fillText(`${a.base ? "HCl" : "NaOH"} added: ${S.vb.toFixed(1)} mL`, 12, 212);
+  g.fillText(`total volume: ${st.V.toFixed(1)} mL`, 12, 230);
+  if (IND[S.ind].lo) { g.fillStyle = "#6b7280"; g.fillText(`indicator: ${pHcolourName(st.pH)}`, 12, 248); }
+  g.fillStyle = "#6b7280"; g.font = "12px Arial"; g.textAlign = "center"; g.fillText(`each particle ≈ ${(st.n0 / 20).toFixed(3)} mmol`, (TB.x0 + TB.x1) / 2, TB.y1 + 20);
+}
+function pHcolourName(pH) { const d = IND[S.ind]; return pH <= d.lo ? d.n1 : pH >= d.hi ? d.n2 : `changing (${d.n1} → ${d.n2})`; }
+function titrationParticles(spread) {
+  const st = tState(S.vb), u = st.n0 / 20;
+  reconcile("t", TB, {HA: cnt(st.nHA, u), A: cnt(st.nA, u), H3O: cnt(st.nH3O, u), OH: cnt(st.nOH, u)}, spread);
+}
+const GX0 = 52, GX1 = 505, GY0 = 12, GY1 = 280;
+function pHaxes(g, xmin, xmax, xlbl, xstep) {
+  const X = v => GX0 + (v - xmin) / (xmax - xmin) * (GX1 - GX0), Y = p => GY1 - p / 14 * (GY1 - GY0);
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let p = 0; p <= 14; p += 2) { g.beginPath(); g.moveTo(GX0, Y(p)); g.lineTo(GX1, Y(p)); g.stroke(); g.fillText(p, GX0 - 5, Y(p) + 4); }
+  g.textAlign = "center";
+  for (let v = xmin; v <= xmax + 1e-9; v += xstep) { g.beginPath(); g.moveTo(X(v), GY0); g.lineTo(X(v), GY1); g.stroke(); g.fillText(v, X(v), GY1 + 15); }
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, GY0); g.lineTo(GX0, GY1); g.lineTo(GX1, GY1); g.stroke();
+  g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText(xlbl, (GX0 + GX1) / 2, GY1 + 34);
+  g.save(); g.translate(14, (GY0 + GY1) / 2); g.rotate(-Math.PI / 2); g.fillText("pH", 0, 0); g.restore();
+  return {X, Y};
+}
+function drawTitrationGraph() {
+  const g = gg; g.clearRect(0, 0, 520, 320);
+  const a = ANA[S.ana], {X, Y} = pHaxes(g, 0, VMAX, `Volume of ${a.base ? "HCl" : "NaOH"} added (mL)`, 10);
+  const d = IND[S.ind];
+  if (d.lo) { g.fillStyle = "rgba(236,72,153,.10)"; if (S.ind === "btb") g.fillStyle = "rgba(37,99,235,.10)"; if (S.ind === "mr") g.fillStyle = "rgba(239,68,68,.10)"; g.fillRect(GX0, Y(d.hi), GX1 - GX0, Y(d.lo) - Y(d.hi)); g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right"; g.fillText("indicator changes color", GX1 - 4, Y(d.hi) - 3); }
+  // the curve so far
+  g.strokeStyle = "#1d4ed8"; g.lineWidth = 2.5; g.beginPath();
+  const n = Math.max(1, Math.round(S.vb / 0.05));
+  for (let i = 0; i <= n; i++) { const v = S.vb * i / n, p = tState(v).pH; i ? g.lineTo(X(v), Y(p)) : g.moveTo(X(v), Y(p)); }
+  g.stroke();
+  const cur = tState(S.vb); g.beginPath(); g.arc(X(S.vb), Y(cur.pH), 5.5, 0, 6.283); g.fillStyle = "#dc2626"; g.fill();
+  // key points once passed
+  if (S.keys) {
+    const ve = veq(), mark = (v, label, sub) => {
+      const p = tState(v).pH; g.strokeStyle = "#94a3b8"; g.setLineDash([4, 3]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(X(v), GY1); g.lineTo(X(v), Y(p)); g.lineTo(GX0, Y(p)); g.stroke(); g.setLineDash([]);
+      g.beginPath(); g.arc(X(v), Y(p), 6, 0, 6.283); g.fillStyle = "#f59e0b"; g.fill();
+      g.fillStyle = "#92400e"; g.font = "bold 12px Arial"; g.textAlign = "left"; g.fillText(label, X(v) + 9, Y(p) + (sub ? -4 : 4)); if (sub) { g.font = "11px Arial"; g.fillText(sub, X(v) + 9, Y(p) + 10); }
+    };
+    if (!a.strong && S.vb >= ve / 2 - 1e-9) mark(ve / 2, "half-equivalence", `pH = pKa = ${fmtp(-Math.log10(a.base ? a.Ka : a.Ka))}`);
+    if (S.vb >= ve - 1e-9) mark(ve, `equivalence point: pH ${fmtp(tState(ve).pH)}`);
+  }
+}
+function titrationText() {
+  const st = tState(S.vb), a = ANA[S.ana], ve = veq(), f = S.vb / ve, ti = a.base ? "HCl" : "NaOH";
+  const nm = {HA: a.HA, A: a.A};
+  $("table").innerHTML = `<tr><th>Species</th><th>${nm.HA}</th><th>${nm.A}</th><th>H₃O⁺</th><th>OH⁻</th></tr>` +
+    `<tr><td>mmol</td><td>${fmtc(st.nHA)}</td><td>${fmtc(st.nA)}</td><td>${fmtc(st.nH3O)}</td><td>${fmtc(st.nOH)}</td></tr>`;
+  $("readout").innerHTML = `pH = <b>${fmtp(st.pH)}</b> &nbsp; [H₃O⁺] = ${fmtc(st.H)} M &nbsp; equivalence at <b>${ve.toFixed(1)} mL</b>`;
+  let w;
+  if (a.strong) {
+    w = f === 0 ? "HCl is a strong acid: it is <b>completely ionized</b>, so the beaker holds H₃O⁺ and Cl⁻ ions and no HCl molecules. pH = −log(0.100) = 1.00."
+      : Math.abs(f - 1) < 0.005 ? "<b>Equivalence point</b>: all the H₃O⁺ has been neutralized by OH⁻. Only Na⁺ and Cl⁻ are left, and neither changes the pH, so <b>pH = 7.00</b>."
+      : f < 1 ? "Each OH⁻ added reacts with an H₃O⁺: H₃O⁺ + OH⁻ → 2 H₂O. The pH rises slowly at first, then very steeply near the equivalence point."
+      : "After the equivalence point there is nothing left to react with the OH⁻, so <b>excess OH⁻</b> sets the pH.";
+  } else {
+    const acid = !a.base, HA = a.HA, A = a.A;
+    if (f === 0) w = acid ? `${HA} is a weak acid: only a small fraction of the molecules give H⁺ to water, so the beaker is mostly <b>${HA} molecules</b>, with a few H₃O⁺ and ${A} ions.`
+      : `NH₃ is a weak base: only a small fraction reacts with water (NH₃ + H₂O ⇌ NH₄⁺ + OH⁻), so the beaker is mostly <b>NH₃ molecules</b>.`;
+    else if (Math.abs(f - 0.5) < 0.02) w = `<b>Half-equivalence point</b>: half of the ${acid ? HA : "NH₃"} has reacted, so <b>[${HA}] = [${A}]</b> and pH = pKa = ${fmtp(-Math.log10(a.Ka))}. This is the best buffer, and the easiest way to find pKa from a titration curve.`;
+    else if (Math.abs(f - 1) < 0.005) w = acid ? `<b>Equivalence point</b>: all the ${HA} has become ${A}. ${A} is a weak base, so the solution is <b>basic: pH ${fmtp(st.pH)}</b>, not 7. Choose an indicator that changes color near this pH.`
+      : `<b>Equivalence point</b>: all the NH₃ has become NH₄⁺, a weak acid, so the solution is <b>acidic: pH ${fmtp(st.pH)}</b>. Choose an indicator that changes color near this pH.`;
+    else if (f < 1) w = acid ? `Each OH⁻ added turns an ${HA} into an ${A}: ${HA} + OH⁻ → ${A} + H₂O. With both ${HA} and ${A} present the solution is a <b>buffer</b>, so the pH changes only slowly.`
+      : "Each H₃O⁺ added turns an NH₃ into NH₄⁺: NH₃ + H₃O⁺ → NH₄⁺ + H₂O. With both NH₃ and NH₄⁺ present the solution is a <b>buffer</b>, so the pH changes only slowly.";
+    else w = acid ? `After the equivalence point the ${A} is a much weaker base than the excess <b>OH⁻</b>, so the excess OH⁻ sets the pH.` : "After the equivalence point the excess <b>H₃O⁺</b> from the HCl sets the pH.";
+  }
+  const d = IND[S.ind];
+  if (d.lo && S.vb >= ve - 1e-9) {
+    const pe = tState(ve).pH, ok = pe >= d.lo - 0.3 && pe <= d.hi + 0.3;
+    w += `<br><span style="color:${ok ? "#047857" : "#b45309"}">${ok ? `Good indicator choice: its color change (pH ${d.lo}–${d.hi}) includes the equivalence pH (${fmtp(pe)}).` : `This indicator changes color at pH ${d.lo}–${d.hi}, but the equivalence point is at pH ${fmtp(pe)}. Its end point would not match the equivalence point.`}</span>`;
+  }
+  $("why").innerHTML = w;
+}
+
+// ---------------------------------------------------------------- buffer tab
+const BW = {x0: 30, x1: 230, y1: 320, top: 150}, BB = {x0: 290, x1: 490, y1: 320, top: 150};
+BW.y0 = BB.y0 = () => 320 - 150 * (100 + S.nH + S.nOH) / 140;
+let drops = [];
+function drawBuffer() {
+  const g = bg, st = bState(), p = PAIRS[S.pair];
+  g.clearRect(0, 0, W, H);
+  beaker(g, BW.x0, BW.x1, BW.top, BW.y1, BW.y0(), "rgba(219,234,254,.55)", "Water");
+  beaker(g, BB.x0, BB.x1, BB.top, BB.y1, BB.y0(), "rgba(219,234,254,.55)", "Buffer");
+  for (const k of ["w", "b"]) for (const q of S.parts[k] || []) drawP(g, q);
+  for (const f of S.fx) { g.beginPath(); g.arc(f.x, f.y, 6 + 10 * (1 - f.t), 0, 6.283); g.strokeStyle = `rgba(234,179,8,${f.t})`; g.lineWidth = 2; g.stroke(); }
+  for (const d of drops) { g.beginPath(); g.arc(d.x, d.y, 6, 0, 6.283); g.fillStyle = COL[d.type]; g.fill(); }
+  g.textAlign = "center"; g.font = "bold 22px Arial";
+  for (const [x, pH] of [[130, st.pHw], [390, st.pH]]) { g.fillStyle = "#1f2937"; g.fillText(`pH ${fmtp(pH)}`, x, 60); }
+  g.font = "13px Arial"; g.fillStyle = "#6b7280";
+  g.fillText(`start: pH 7.00`, 130, 82);
+  const pH0 = -Math.log10(solveH((S.cHA + S.cA), p.Ka, S.cA));
+  g.fillText(`start: pH ${fmtp(pH0)}`, 390, 82);
+  const net = S.nOH - S.nH;
+  g.fillStyle = "#334155"; g.font = "bold 13px Arial";
+  g.fillText(net === 0 ? (S.nH ? `added ${S.nH} mmol H₃O⁺ and ${S.nOH} mmol OH⁻` : "nothing added yet") : `net added: ${Math.abs(net)} mmol ${net < 0 ? "H₃O⁺" : "OH⁻"}`, 260, 24);
+  g.font = "12px Arial"; g.fillStyle = "#6b7280"; g.textAlign = "right"; g.fillText("each particle = 1 mmol", W - 8, H - 4);
+}
+function bufferParticles(spread) {
+  const st = bState();
+  reconcile("w", BW, {H3O: cnt(st.wH3O, 1), OH: cnt(st.wOH, 1)}, spread);
+  reconcile("b", BB, {HA: cnt(st.nHA, 1), A: cnt(st.nA, 1), H3O: cnt(st.nH3O, 1), OH: cnt(st.nOHf, 1)}, spread);
+}
+function drawBufferGraph() {
+  const g = gg; g.clearRect(0, 0, 520, 320);
+  const {X, Y} = pHaxes(g, -20, 20, "mmol of strong acid (−) or strong base (+) added", 5);
+  g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "left"; g.fillText("← HCl", GX0 + 4, GY1 - 6); g.textAlign = "right"; g.fillText("NaOH →", GX1 - 4, GY1 - 6);
+  for (const [key, col] of [["pHw", "#dc2626"], ["pH", "#1d4ed8"]]) {
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath();
+    S.bpts.forEach((q, i) => { i ? g.lineTo(X(q.net), Y(q[key])) : g.moveTo(X(q.net), Y(q[key])); }); g.stroke();
+    for (const q of S.bpts) { g.beginPath(); g.arc(X(q.net), Y(q[key]), 4, 0, 6.283); g.fillStyle = col; g.fill(); }
+  }
+}
+function bufferText() {
+  const st = bState(), p = PAIRS[S.pair], pKa = -Math.log10(p.Ka);
+  $("readout").innerHTML = st.nHA > 0.05 && st.nA > 0.05
+    ? `pH = pKa + log([${p.A}]/[${p.HA}]) = ${fmtp(pKa)} + log(${st.nA.toFixed(1)}/${st.nHA.toFixed(1)}) = <b>${fmtp(pKa + Math.log10(st.nA / st.nHA))}</b>`
+    : `One buffer component is used up: the Henderson–Hasselbalch equation no longer applies.`;
+  $("table").innerHTML = `<tr><th></th><th>${p.HA} (mmol)</th><th>${p.A} (mmol)</th><th>can still absorb</th></tr>` +
+    `<tr><td>Buffer</td><td>${st.nHA.toFixed(1)}</td><td>${st.nA.toFixed(1)}</td><td>${Math.max(0, st.nA).toFixed(1)} mmol H₃O⁺, ${Math.max(0, st.nHA).toFixed(1)} mmol OH⁻</td></tr>`;
+}
+function bufferWhy(kind) {
+  const st = bState(), p = PAIRS[S.pair];
+  const T = {
+    start: `Two beakers: 100 mL of pure water, and 100 mL of a buffer that contains a weak acid (${p.HA}) and its conjugate base (${p.A}). Add strong acid or base to both and compare how much the pH changes.`,
+    acid: st.nA > 0.3 ? `The added H₃O⁺ reacts with the conjugate base: <b>${p.A} + H₃O⁺ → ${p.HA} + H₂O</b>. The H₃O⁺ is used up, so the buffer's pH barely changes. In the water nothing removes it, so the pH drops sharply.`
+      : `The buffer has run out of ${p.A}, so the added H₃O⁺ stays in solution and the pH drops quickly: its <b>buffer capacity</b> is used up.`,
+    base: st.nHA > 0.3 ? `The added OH⁻ reacts with the weak acid: <b>${p.HA} + OH⁻ → ${p.A} + H₂O</b>. The OH⁻ is used up, so the buffer's pH barely changes. In the water nothing removes it, so the pH rises sharply.`
+      : `The buffer has run out of ${p.HA}, so the added OH⁻ stays in solution and the pH rises quickly: its <b>buffer capacity</b> is used up.`,
+    ratio: `The pH of a buffer depends on the <b>ratio</b> [${p.A}]/[${p.HA}]: equal amounts give pH = pKa. More of both (same ratio) gives the same pH but a bigger <b>capacity</b>.`,
+    pair: `Choose a buffer whose pKa is close to the pH you want: this pair works best near pH ${fmtp(-Math.log10(p.Ka))}.`
+  };
+  $("why").innerHTML = T[kind];
+}
+function addBuffer(type) {
+  if (type === "H3O") S.nH += 1; else S.nOH += 1;
+  for (const x of [130, 390]) drops.push({x, y: 100, type, vy: 0});
+  const st = bState(); S.bpts.push({net: S.nOH - S.nH, pH: st.pH, pHw: st.pHw});
+  bufferWhy(type === "H3O" ? "acid" : "base"); bufferText();
+}
+
+// ---------------------------------------------------------------- controls
+$("ana").innerHTML = Object.keys(ANA).map(k => `<option value="${k}">${ANA[k].lbl}</option>`).join("");
+$("ind").innerHTML = Object.keys(IND).map(k => `<option value="${k}">${IND[k].lbl}</option>`).join("");
+$("pair").innerHTML = Object.keys(PAIRS).map(k => `<option value="${k}">${PAIRS[k].lbl}</option>`).join("");
+function addTitrant(v) { const nv = Math.min(VMAX, Math.round((S.vb + v) * 100) / 100); if (nv === S.vb) return; S.vb = nv; dripFx.push({y: 140}); titrationParticles(); titrationText(); }
+for (const b of document.querySelectorAll("[data-add]")) b.onclick = () => { stopDrip(); addTitrant(+b.dataset.add); };
+function stopDrip() { S.drip = false; $("b-drip").textContent = "▶ Drip"; }
+$("b-drip").onclick = () => { S.drip = !S.drip; $("b-drip").textContent = S.drip ? "❚❚ Stop" : "▶ Drip"; };
+$("ana").onchange = () => { S.ana = $("ana").value; resetT(); };
+$("ind").onchange = () => { S.ind = $("ind").value; titrationText(); };
+$("keys").onchange = () => { S.keys = $("keys").checked; };
+$("b-reset").onclick = () => S.mode === "titration" ? resetT() : resetB("start");
+$("b-acid").onclick = () => addBuffer("H3O"); $("b-base").onclick = () => addBuffer("OH");
+$("pair").onchange = () => { S.pair = $("pair").value; resetB("pair"); };
+$("cha").addEventListener("input", e => { S.cHA = +e.target.value; resetB("ratio"); });
+$("ca").addEventListener("input", e => { S.cA = +e.target.value; resetB("ratio"); });
+function resetT() { stopDrip(); S.vb = 0; S.parts.t = []; titrationParticles(true); titrationText(); legend(); }
+function resetB(why) {
+  S.nH = 0; S.nOH = 0; drops = []; const p = PAIRS[S.pair];
+  $("hal").textContent = `[${p.HA}]`; $("al").textContent = `[${p.A}]`; $("chav").textContent = `${S.cHA.toFixed(2)} M`; $("cav").textContent = `${S.cA.toFixed(2)} M`;
+  S.parts.w = []; S.parts.b = []; bufferParticles(true);
+  const st = bState(); S.bpts = [{net: 0, pH: st.pH, pHw: st.pHw}];
+  bufferText(); bufferWhy(why); legend();
+}
+function legend() {
+  if (S.mode === "titration") {
+    const a = ANA[S.ana];
+    $("legend").innerHTML = `${a.strong ? "" : `<span><span class="dot" style="background:${COL.HA}"></span>${a.HA}</span>`}<span><span class="dot" style="background:${COL.A}"></span>${a.A}</span><span><span class="dot" style="background:${COL.H3O}"></span>H₃O⁺</span><span><span class="dot" style="background:${COL.OH}"></span>OH⁻</span><span>(${a.base ? "Cl⁻" : "Na⁺"} spectator ions not shown)</span>`;
+    $("glegend").innerHTML = `<span><span class="dot" style="background:#dc2626"></span>now</span>${S.keys ? '<span><span class="dot" style="background:#f59e0b"></span>key points</span>' : ""}`;
+    $("gtitle").textContent = "Titration curve";
+  } else {
+    const p = PAIRS[S.pair];
+    $("legend").innerHTML = `<span><span class="dot" style="background:${COL.HA}"></span>${p.HA}</span><span><span class="dot" style="background:${COL.A}"></span>${p.A}</span><span><span class="dot" style="background:${COL.H3O}"></span>H₃O⁺</span><span><span class="dot" style="background:${COL.OH}"></span>OH⁻</span><span>(spectator ions not shown)</span>`;
+    $("glegend").innerHTML = `<span><span class="dot" style="background:#dc2626"></span>water</span><span><span class="dot" style="background:#1d4ed8"></span>buffer</span>`;
+    $("gtitle").textContent = "pH as strong acid or base is added";
+  }
+}
+function setMode(m) {
+  S.mode = m; S.parts = {}; S.fx = [];
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const e of document.querySelectorAll(".ti")) e.style.display = m === "titration" ? "" : "none";
+  for (const e of document.querySelectorAll(".bu")) e.style.display = m === "buffer" ? "" : "none";
+  $("foot").innerHTML = m === "titration"
+    ? "25.0 mL of analyte, titrated with 0.100 M titrant. The pH is calculated exactly (no approximations) from the charge balance, including the effect of dilution. Particles show the main species; H₃O⁺ and OH⁻ appear when there is a meaningful amount."
+    : "Each beaker starts with 100 mL. Each addition is 1 mL of 1.0 M acid or base (1 mmol). The pH is calculated exactly from the charge balance.";
+  if (m === "titration") resetT(); else resetB("start");
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+
+// ---------------------------------------------------------------- first-visit tours
+const TOURS = {
+  titration: [
+    ["#box", "The beaker holds the analyte. Each particle stands for a fixed amount of one species. The liquid takes the color of the indicator."],
+    ["#ctl", "Choose the acid or base to titrate and an indicator. Add titrant from the burette in small or big steps, or let it drip."],
+    ["#graph", "The titration curve builds up as you add titrant. The half-equivalence and equivalence points are marked once you pass them."],
+    ["#why", "What is happening in the beaker right now, and why the pH is what it is."]
+  ],
+  buffer: [
+    ["#box", "Pure water (left) and a buffer (right). Each particle is 1 mmol."],
+    ["#ctl", "Add 1 mmol of strong acid or strong base to <b>both</b> beakers at once. Change the buffer pair or the amounts of acid and conjugate base."],
+    ["#graph", "The pH of both beakers as you add acid (left) or base (right). Keep adding to find the buffer capacity."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-titr-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {titration: "Titration", buffer: "Buffers"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
+// ---------------------------------------------------------------- run
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, W, H); hiDPI(graph, 520, 320);
+let last = performance.now(), dripAcc = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.mode === "titration") {
+    if (S.drip) {
+      // slow down near the equivalence point, like a careful student would
+      const near = Math.abs(S.vb - veq()) < 2, rate = near ? 0.25 : 1.2;
+      dripAcc += dt * rate; while (dripAcc >= 0.1) { dripAcc -= 0.1; addTitrant(0.1); }
+      if (S.vb >= VMAX) stopDrip();
+    }
+    for (const d of dripFx) d.y += dt * 260; dripFx = dripFx.filter(d => d.y < TB.y0());
+    moveParts(dt); drawTitration(); drawTitrationGraph();
+  } else {
+    for (const d of drops) { d.vy += 600 * dt; d.y += d.vy * dt; } drops = drops.filter(d => d.y < BW.y0());
+    if (!drops.length) bufferParticles();
+    moveParts(dt); drawBuffer(); drawBufferGraph();
+  }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const a = q.get("analyte"); if (a && ANA[a]) { S.ana = a; }
+  $("ana").value = S.ana; $("ind").value = S.ind; $("pair").value = S.pair;
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "buffer" ? "buffer" : "titration");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>

@@ -107,6 +107,21 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertStringNotContainsString('k=5', $out);
     }
 
+    public function test_every_sim_has_a_file_and_a_title(): void {
+        foreach (\filter_chemsim\local\sims::names() as $name) {
+            $sim = \filter_chemsim\local\sims::get($name);
+            $this->assertFileExists(__DIR__ . '/../sims/' . $sim['file']);
+            $this->assertNotEmpty(get_string('sim_' . $name, 'filter_chemsim'));
+            $out = $this->run_filter('[chemsim ' . $name . ']');
+            $this->assertStringContainsString($sim['file'] . '?v=', $out);
+        }
+    }
+
+    public function test_galvanic_options(): void {
+        $out = $this->run_filter('[chemsim galvanic left=Cu right=Ag predict=1]');
+        $this->assertStringContainsString('galvanic.html?left=Cu&amp;right=Ag&amp;predict=1', $out);
+    }
+
     public function test_text_without_shortcode_unchanged(): void {
         $text = '<p>No simulations here [chem] at all.</p>';
         $this->assertSame($text, $this->run_filter($text));

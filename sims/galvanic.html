@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galvanic Cell</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type=range] { flex: 1 1 140px; height: 32px; min-width: 120px; }
+.val { font-weight: bold; min-width: 4.5em; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+table.stats { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 4px; }
+table.stats td, table.stats th { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.stats th { font-size: 12px; color: var(--muted); font-weight: normal; width: 8.5em; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.ok { color: #047857; } .bad { color: #b91c1c; }
+#quiz { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: #fffbeb; border: 1px solid #fde68a; font-size: 15px; line-height: 1.5; }
+#quiz button { margin: 6px 6px 0 0; }
+.tourbtn { margin-left: auto; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="head"><h1 id="title" style="margin:0">Galvanic Cell</h1><button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button></div>
+
+<div class="row">
+  <div class="card" style="flex:1 1 480px" id="boxcard">
+    <canvas id="box" width="520" height="390" aria-label="Galvanic cell with two half-cells, a wire, a voltmeter and a salt bridge"></canvas>
+    <div class="legend"><span><span class="dot" style="background:#facc15;border:1px solid #a16207"></span>electron</span><span><span class="dot" style="background:#a855f7"></span>K⁺</span><span><span class="dot" style="background:#f97316"></span>NO₃⁻</span><span>(salt bridge: KNO₃)</span></div>
+    <div class="ctl" id="ctl">
+      <b>Left</b>
+      <div><select id="mL"></select><input type="range" id="cL" min="-3" max="0.3" step="0.1" value="0"><span class="val" id="cLv"></span></div>
+      <b>Right</b>
+      <div><select id="mR"></select><input type="range" id="cR" min="-3" max="0.3" step="0.1" value="0"><span class="val" id="cRv"></span></div>
+      <b>Circuit</b>
+      <div><button id="b-bulb">💡 Connect the bulb</button><label class="chk"><input type="checkbox" id="bridge" checked> Salt bridge</label><button id="b-reset">↺ Reset</button></div>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1 1 480px" id="infocard">
+    <div id="quiz" style="display:none"></div>
+    <table class="stats" id="table"></table>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note">Standard reduction potentials at 25 °C; each beaker holds 100 mL. When the bulb is connected the reaction is speeded up enormously so you can watch the concentrations change. A voltmeter draws almost no current, so it reads the cell potential without running the reaction.</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const F = 96485;
+const MET = {
+  Mg: {ion: "Mg²⁺", z: 2, E: -2.37, col: "#cbd5e1", sol: null},
+  Al: {ion: "Al³⁺", z: 3, E: -1.66, col: "#d1d5db", sol: null},
+  Zn: {ion: "Zn²⁺", z: 2, E: -0.76, col: "#94a3b8", sol: null},
+  Fe: {ion: "Fe²⁺", z: 2, E: -0.44, col: "#78716c", sol: [190, 230, 160]},
+  Ni: {ion: "Ni²⁺", z: 2, E: -0.25, col: "#a8a29e", sol: [110, 200, 120]},
+  Pb: {ion: "Pb²⁺", z: 2, E: -0.13, col: "#64748b", sol: null},
+  Cu: {ion: "Cu²⁺", z: 2, E: 0.34, col: "#c2703d", sol: [60, 130, 230]},
+  Ag: {ion: "Ag⁺", z: 1, E: 0.80, col: "#e5e7eb", sol: null}
+};
+const S = {mL: "Zn", mR: "Cu", c: {L: 1, R: 1}, c0: {L: 1, R: 1}, bulb: false, bridge: true, used: {L: 0, R: 0}, el: [], br: [], ions: {L: [], R: []}, fx: [],
+  predict: false, answered: true, lastE: null};
+const gcd = (a, b) => b ? gcd(b, a % b) : a, lcm = (a, b) => a * b / gcd(a, b);
+const Ered = side => { const m = MET[side === "L" ? S.mL : S.mR]; return m.E - 0.05916 / m.z * Math.log10(1 / Math.max(S.c[side], 1e-300)); };
+function cell() {
+  const eL = Ered("L"), eR = Ered("R"), cath = eR >= eL ? "R" : "L", an = cath === "R" ? "L" : "R";
+  const mc = MET[cath === "L" ? S.mL : S.mR], ma = MET[an === "L" ? S.mL : S.mR];
+  const n = lcm(ma.z, mc.z), E0 = mc.E - ma.E, E = Math.abs(eR - eL);
+  return {cath, an, mc, ma, symC: cath === "L" ? S.mL : S.mR, symA: an === "L" ? S.mL : S.mR, n, E0, E, same: S.mL === S.mR};
+}
+const flowing = () => S.bulb && S.bridge && (!S.predict || S.answered);
+function fmtC(c) { return c >= 0.1 ? c.toFixed(2) + " M" : c >= 0.001 ? c.toFixed(3) + " M" : c > 0 ? c.toExponential(1).replace("e", "E") + " M" : "0 M"; }
+function sciK(log10K) {
+  if (Math.abs(log10K) < 3) return (Math.pow(10, log10K)).toPrecision(2);
+  const e = Math.floor(log10K), m = Math.pow(10, log10K - e); return `${m.toFixed(1)} × 10<sup>${e}</sup>`;
+}
+const coef = (k, s) => (k === 1 ? "" : k + " ") + s;
+
+// ---------------------------------------------------------------- the reaction running while current flows
+function run(dt) {
+  if (!flowing()) return;
+  const c = cell(); if (c.E < 1e-5) return;
+  let e = 0.009 * Math.min(1, c.E / 0.03) * dt;                 // mol of electrons this step
+  e = Math.min(e, S.c[c.cath] * 0.1 * c.mc.z * 0.5);            // never use up more than half the cathode ions in one step
+  const c0 = {L: S.c.L, R: S.c.R};
+  for (let k = 0; k < 60; k++) {                                // do not step past equilibrium (E would change sign)
+    S.c[c.cath] = c0[c.cath] - e / c.mc.z / 0.1; S.c[c.an] = c0[c.an] + e / c.ma.z / 0.1;
+    if (cell().cath === c.cath || cell().E < 1e-5) break;
+    e /= 2;
+  }
+  S.used[c.an] += e / c.ma.z; S.used[c.cath] -= e / c.mc.z;
+}
+
+// ---------------------------------------------------------------- drawing
+const W = 520, H = 390, BK = {L: {x0: 22, x1: 212}, R: {x0: 308, x1: 498}}, BY0 = 215, BY1 = 372, LIQ = 232;
+const EX = {L: 82, R: 438};               // electrode centres
+const box = $("box"), bg = box.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, W, H);
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function syncIons(side) {
+  const want = S.c[side] < 0.03 ? 0 : Math.min(26, Math.max(1, Math.round(12 * S.c[side])));
+  const a = S.ions[side], b = BK[side];
+  while (a.length < want) a.push({x: rnd(b.x0 + 12, b.x1 - 12), y: rnd(LIQ + 12, BY1 - 10), vx: rnd(-15, 15), vy: rnd(-15, 15)});
+  while (a.length > want) a.splice(Math.floor(Math.random() * a.length), 1);
+}
+// path of the wire: anode electrode -> up -> across -> down to cathode electrode
+function wirePt(t, from, to) {
+  const xa = EX[from], xc = EX[to], top = 52, ya = 150, L1 = ya - top, L2 = Math.abs(xc - xa), tot = 2 * L1 + L2, d = t * tot;
+  if (d < L1) return [xa, ya - d];
+  if (d < L1 + L2) return [xa + Math.sign(xc - xa) * (d - L1), top];
+  return [xc, top + (d - L1 - L2)];
+}
+// path inside the salt bridge, from left to right
+function bridgePt(t) {
+  const xl = 200, xr = 320, top = 176, bot = 268, L1 = bot - top, L2 = xr - xl, tot = 2 * L1 + L2, d = t * tot;
+  if (d < L1) return [xl, bot - d];
+  if (d < L1 + L2) return [xl + (d - L1), top];
+  return [xr, top + (d - L1 - L2)];
+}
+function draw(dt) {
+  const g = bg, c = cell(), flow = flowing(), reveal = !S.predict || S.answered;
+  g.clearRect(0, 0, W, H);
+  for (const side of ["L", "R"]) {
+    const b = BK[side], m = MET[side === "L" ? S.mL : S.mR];
+    // solution
+    let fill = "rgba(219,234,254,.45)";
+    if (m.sol) { const a = Math.min(0.6, 0.12 + 0.4 * Math.min(1, S.c[side])); fill = `rgba(${m.sol[0]},${m.sol[1]},${m.sol[2]},${S.c[side] < 0.01 ? 0.08 : a})`; }
+    g.fillStyle = fill; g.fillRect(b.x0, LIQ, b.x1 - b.x0, BY1 - LIQ);
+    g.strokeStyle = "#475569"; g.lineWidth = 3; g.beginPath(); g.moveTo(b.x0 - 6, BY0 - 4); g.lineTo(b.x0, BY0); g.lineTo(b.x0, BY1); g.lineTo(b.x1, BY1); g.lineTo(b.x1, BY0); g.lineTo(b.x1 + 6, BY0 - 4); g.stroke();
+    // ions in solution
+    syncIons(side);
+    for (const p of S.ions[side]) {
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.x < b.x0 + 8 || p.x > b.x1 - 8) p.vx *= -1; if (p.y < LIQ + 8 || p.y > BY1 - 8) p.vy *= -1;
+      if (Math.abs(p.x - EX[side]) < 22) p.x += Math.sign(p.x - EX[side] || 1) * 2;
+      g.beginPath(); g.arc(p.x, p.y, 6, 0, 6.283); g.fillStyle = m.sol ? `rgb(${m.sol.map(v => Math.round(v * 0.7))})` : "#64748b"; g.fill();
+      g.fillStyle = "#fff"; g.font = "bold 9px Arial"; g.textAlign = "center"; g.fillText("+", p.x, p.y + 3);
+    }
+    // electrode: anode thins, cathode thickens
+    const used = S.used[side], wE = Math.max(6, Math.min(44, 26 - used * 60)), hE = 210;
+    g.fillStyle = m.col; g.fillRect(EX[side] - wE / 2, 150, wE, hE); g.strokeStyle = "#334155"; g.lineWidth = 1.5; g.strokeRect(EX[side] - wE / 2, 150, wE, hE);
+    g.fillStyle = "#1f2937"; g.font = "bold 14px Arial"; g.textAlign = "center"; g.fillText(side === "L" ? S.mL : S.mR, EX[side], 145);
+    g.font = "12px Arial"; g.fillStyle = "#334155"; g.fillText(`${m.ion} ${fmtC(S.c[side])}`, (b.x0 + b.x1) / 2 + (side === "L" ? 30 : -30), BY1 + 15);
+    // labels
+    if (reveal && c.E > 1e-4) {
+      const isA = c.an === side; g.font = "bold 13px Arial"; g.fillStyle = isA ? "#b91c1c" : "#1d4ed8";
+      const lx = side === "L" ? 150 : 370;
+      g.fillText(isA ? "ANODE (−)" : "CATHODE (+)", lx, 112);
+      g.font = "11px Arial"; g.fillText(isA ? "oxidation" : "reduction", lx, 126);
+    }
+  }
+  // wire + voltmeter + bulb
+  g.strokeStyle = "#1f2937"; g.lineWidth = 3; g.beginPath(); g.moveTo(EX.L, 150); g.lineTo(EX.L, 52); g.lineTo(EX.R, 52); g.lineTo(EX.R, 150); g.stroke();
+  if (S.bulb) {
+    const bx = 160, by = 52, glow = flow ? Math.min(1, c.E / 1.2) : 0;
+    if (glow > 0.02) { const gr = g.createRadialGradient(bx, by - 8, 2, bx, by - 8, 40); gr.addColorStop(0, `rgba(253,224,71,${0.9 * glow})`); gr.addColorStop(1, "rgba(253,224,71,0)"); g.fillStyle = gr; g.beginPath(); g.arc(bx, by - 8, 40, 0, 6.283); g.fill(); }
+    g.beginPath(); g.arc(bx, by - 10, 13, 0, 6.283); g.fillStyle = glow > 0.02 ? `rgb(253,${Math.round(240 - 30 * glow)},${Math.round(150 - 100 * glow)})` : "#f8fafc"; g.fill(); g.strokeStyle = "#475569"; g.lineWidth = 2; g.stroke();
+    g.fillStyle = "#94a3b8"; g.fillRect(bx - 6, by + 2, 12, 7);
+  }
+  // salt bridge
+  if (S.bridge) {
+    g.strokeStyle = "rgba(148,163,184,.9)"; g.lineWidth = 22; g.lineJoin = "round"; g.beginPath(); g.moveTo(200, 268); g.lineTo(200, 176); g.lineTo(320, 176); g.lineTo(320, 268); g.stroke();
+    g.strokeStyle = "rgba(241,245,249,1)"; g.lineWidth = 16; g.stroke(); g.lineJoin = "miter";
+    g.fillStyle = "#475569"; g.font = "11px Arial"; g.textAlign = "center"; g.fillText("salt bridge (KNO₃)", 260, 168);
+    if (!S.br.length) for (let i = 0; i < 14; i++) S.br.push({t: i / 14 + rnd(0, 0.03), k: i % 2 === 0, j: rnd(-4, 4)});
+    const toR = c.cath === "R";   // cations move toward the cathode, anions toward the anode
+    for (const p of S.br) {
+      if (flow && c.E > 1e-4) p.t += (p.k === toR ? 1 : -1) * dt * 0.05 * Math.min(1, c.E / 0.3 + 0.2);
+      p.t = (p.t + 1) % 1; const [x, y] = bridgePt(p.t), horiz = y === 176;
+      g.beginPath(); g.arc(x + (horiz ? 0 : p.j), y + (horiz ? p.j : 0), 4.5, 0, 6.283); g.fillStyle = p.k ? "#a855f7" : "#f97316"; g.fill();
+    }
+  }
+  // electrons
+  if (!S.el.length) for (let i = 0; i < 16; i++) S.el.push({t: i / 16});
+  for (const p of S.el) {
+    if (flow && c.E > 1e-4) p.t = (p.t + dt * 0.12 * Math.min(1, c.E / 0.3 + 0.15)) % 1;
+    const [x, y] = wirePt(p.t, reveal ? c.an : "L", reveal ? c.cath : "R");
+    g.beginPath(); g.arc(x, y, 4, 0, 6.283); g.fillStyle = "#facc15"; g.fill(); g.strokeStyle = "#a16207"; g.lineWidth = 1; g.stroke();
+  }
+  if (flow && reveal && c.E > 1e-4) {
+    // arrow showing electron direction
+    const dir = c.cath === "R" ? 1 : -1, ax = 360; g.fillStyle = "#a16207"; g.font = "bold 12px Arial"; g.textAlign = "center";
+    g.fillText(dir > 0 ? "e⁻ →" : "← e⁻", ax, 40);
+    // atoms leaving the anode / arriving at the cathode
+    if (Math.random() < dt * 4) S.fx.push({side: c.an, t: 1, y: rnd(260, 350), out: true});
+    if (Math.random() < dt * 4) S.fx.push({side: c.cath, t: 1, y: rnd(260, 350), out: false});
+  }
+  g.strokeStyle = "#1f2937"; const vx = 260, vy = 52; g.beginPath(); g.arc(vx, vy, 30, 0, 6.283); g.fillStyle = "#fff"; g.fill(); g.lineWidth = 3; g.stroke();
+  g.fillStyle = "#1f2937"; g.font = "bold 15px Arial"; g.textAlign = "center";
+  g.strokeStyle = "#1f2937";
+  const shown = S.bridge ? c.E : 0;
+  g.fillText(reveal ? shown.toFixed(3) + " V" : "? V", vx, vy + 5); g.font = "10px Arial"; g.fillStyle = "#6b7280"; g.fillText("voltmeter", vx, vy + 44);
+  for (const f of S.fx) {
+    f.t -= dt * 1.5; const s = f.side === "L" ? 1 : -1, d = (f.out ? 1 - f.t : f.t) * 30;
+    const x = EX[f.side] + s * (16 + d), m = MET[f.side === "L" ? S.mL : S.mR];
+    g.beginPath(); g.arc(x, f.y, 6, 0, 6.283); g.fillStyle = `rgba(250,204,21,${0.6 * f.t})`; g.fill();
+    g.beginPath(); g.arc(x, f.y, 5, 0, 6.283); g.fillStyle = m.sol ? `rgb(${m.sol.map(v => Math.round(v * 0.7))})` : "#64748b"; g.fill();
+  }
+  S.fx = S.fx.filter(f => f.t > 0);
+  if (!S.bridge) { g.fillStyle = "#b91c1c"; g.font = "bold 13px Arial"; g.textAlign = "center"; g.fillText("no salt bridge: the circuit is not complete", 260, 190); }
+}
+
+// ---------------------------------------------------------------- panel
+function panel() {
+  const c = cell(), reveal = !S.predict || S.answered;
+  if (!reveal) { $("table").innerHTML = ""; return; }
+  const kA = c.n / c.ma.z, kC = c.n / c.mc.z;
+  const dG = -c.n * F * c.E0 / 1000, logK = c.n * c.E0 / 0.05916;
+  let rows;
+  if (c.same) {
+    rows = [
+      ["Anode (oxidation)", `${c.symA}(s) → ${c.ma.ion}(${S.c[c.an] < S.c[c.cath] ? "dilute" : "conc."}) + ${c.ma.z} e⁻`],
+      ["Cathode (reduction)", `${c.mc.ion}(${S.c[c.cath] > S.c[c.an] ? "conc." : "dilute"}) + ${c.mc.z} e⁻ → ${c.symC}(s)`],
+      ["Concentration cell", `E° = 0, so the only driving force is the difference in concentration. E = −(0.0592/${c.n}) log(Q) = <b>${c.E.toFixed(3)} V</b>`]
+    ];
+  } else {
+    rows = [
+      ["Anode (oxidation)", `${c.symA}(s) → ${c.ma.ion}(aq) + ${c.ma.z} e⁻ &nbsp; <span style="color:var(--muted)">(E°<sub>red</sub> = ${c.ma.E.toFixed(2)} V)</span>`],
+      ["Cathode (reduction)", `${c.mc.ion}(aq) + ${c.mc.z} e⁻ → ${c.symC}(s) &nbsp; <span style="color:var(--muted)">(E°<sub>red</sub> = ${c.mc.E >= 0 ? "+" : ""}${c.mc.E.toFixed(2)} V)</span>`],
+      ["Overall", `${coef(kA, c.symA + "(s)")} + ${coef(kC, c.mc.ion + "(aq)")} → ${coef(kA, c.ma.ion + "(aq)")} + ${coef(kC, c.symC + "(s)")} &nbsp; (n = ${c.n})`],
+      ["E°<sub>cell</sub>", `E°<sub>cathode</sub> − E°<sub>anode</sub> = ${c.mc.E.toFixed(2)} − (${c.ma.E.toFixed(2)}) = <b>${c.E0.toFixed(2)} V</b>`],
+      ["ΔG°", `−nFE° = −${c.n} × 96 485 × ${c.E0.toFixed(2)} = <b>${Math.round(dG)} kJ/mol</b>`],
+      ["K", `10<sup>nE°/0.0592</sup> = <b>${sciK(logK)}</b>`],
+      ["E<sub>cell</sub> now", `E° − (0.0592/${c.n}) log Q = <b>${c.E.toFixed(3)} V</b>`]
+    ];
+  }
+  $("table").innerHTML = rows.map(([a, b]) => `<tr><th>${a}</th><td>${b}</td></tr>`).join("");
+}
+function explain(kind) {
+  const c = cell();
+  if (S.predict && !S.answered) { $("why").innerHTML = "Use the table of standard reduction potentials: the half-cell with the <b>higher</b> E°<sub>red</sub> is reduced."; return; }
+  const T = {
+    start: c.same
+      ? `Both half-cells are ${c.symA}, so E° = 0. A voltage only appears if the concentrations are different: the <b>dilute</b> side is the anode (its metal dissolves to make more ions) and the <b>concentrated</b> side is the cathode (its ions plate out). Connect the bulb and watch the concentrations even out.`
+      : `${c.mc.ion} has the higher reduction potential (${c.mc.E.toFixed(2)} V vs ${c.ma.E.toFixed(2)} V), so it is <b>reduced at the cathode</b>; ${c.symA} is <b>oxidized at the anode</b>. Electrons flow through the <b>wire</b> from anode to cathode. Connect the bulb to let current flow.`,
+    flow: `Current is flowing. Electrons leave the ${c.symA} anode through the wire; the anode slowly dissolves and the ${c.ma.ion} concentration rises. At the cathode ${c.mc.ion} ions gain electrons and plate out as ${c.symC}. In the salt bridge, <b>anions (NO₃⁻) move toward the anode</b> and <b>cations (K⁺) toward the cathode</b>, keeping both beakers electrically neutral. Electrons never travel through the solution or the salt bridge.`,
+    falling: `As the reaction runs, Q gets bigger (more ${c.ma.ion}, less ${c.mc.ion}), so E<sub>cell</sub> = E° − (0.0592/n) log Q <b>gets smaller</b>.`,
+    dead: `E<sub>cell</sub> = 0: the reaction has reached <b>equilibrium</b> (Q = K). There is no driving force left, so no more current flows: the battery is "dead".`,
+    nobridge: "Without the salt bridge the circuit is not complete. The first few electrons that moved would leave one beaker positive and the other negative, which stops the flow at once. The voltmeter reads 0 and the bulb goes out.",
+    bridge: "With the salt bridge back in place, ions can move between the beakers to keep them neutral, so the circuit is complete again.",
+    conc: c.same ? T_concSame() : `Changing a concentration changes E<sub>cell</sub> through the Nernst equation: <b>more reactant ion (${c.mc.ion}) or less product ion (${c.ma.ion}) makes E bigger</b>, because Q gets smaller. E° does not change.`
+  };
+  $("why").innerHTML = T[kind] || T.start;
+}
+function T_concSame() { return "In a concentration cell, the bigger the difference in concentration, the bigger the voltage. When both concentrations are equal, E = 0."; }
+function quiz() {
+  const q = $("quiz");
+  if (!S.predict) { q.style.display = "none"; return; }
+  q.style.display = "";
+  if (S.answered) return;
+  const c = cell();
+  q.innerHTML = `<b>Predict:</b> which electrode is the <b>anode</b> (where oxidation happens)?<br><button data-a="L">Left: ${S.mL}</button><button data-a="R">Right: ${S.mR}</button>`;
+  q.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const ok = b.dataset.a === c.an; S.answered = true;
+    q.innerHTML = ok ? `<span class="ok">✓ Correct: ${c.symA} is oxidized${c.same ? " (it is the more dilute side)" : `, because ${c.ma.ion}/${c.symA} has the lower reduction potential`}.</span>`
+      : `<span class="bad">✗ Not quite: ${c.symA} is the anode${c.same ? ", because it is the more dilute side" : `. ${c.mc.ion} has the higher reduction potential, so it is reduced at the cathode, and ${c.symA} is oxidized`}.</span>`;
+    panel(); explain("start");
+  });
+}
+
+// ---------------------------------------------------------------- controls
+const opts = Object.keys(MET).map(k => `<option value="${k}">${k} | ${MET[k].ion} (${MET[k].E >= 0 ? "+" : ""}${MET[k].E.toFixed(2)} V)</option>`).join("");
+$("mL").innerHTML = opts; $("mR").innerHTML = opts;
+function showC() { $("cLv").textContent = fmtC(S.c.L); $("cRv").textContent = fmtC(S.c.R); }
+function setConc(side, v) { S.c[side] = Math.round(Math.pow(10, v) * 1000) / 1000; S.c0[side] = S.c[side]; showC(); panel(); explain("conc"); }
+$("cL").addEventListener("input", e => setConc("L", +e.target.value));
+$("cR").addEventListener("input", e => setConc("R", +e.target.value));
+function newCell() {
+  S.mL = $("mL").value; S.mR = $("mR").value; S.used = {L: 0, R: 0}; S.ions = {L: [], R: []}; S.fx = []; S.bulb = false; $("b-bulb").classList.remove("on"); $("b-bulb").textContent = "💡 Connect the bulb";
+  S.c = {L: Math.round(Math.pow(10, +$("cL").value) * 1000) / 1000, R: Math.round(Math.pow(10, +$("cR").value) * 1000) / 1000};
+  S.answered = !S.predict; showC(); panel(); quiz(); explain("start"); S.state = "start";
+}
+$("mL").onchange = newCell; $("mR").onchange = newCell;
+$("b-reset").onclick = () => { newCell(); };
+$("b-bulb").onclick = () => {
+  S.bulb = !S.bulb; $("b-bulb").classList.toggle("on", S.bulb); $("b-bulb").textContent = S.bulb ? "💡 Disconnect the bulb" : "💡 Connect the bulb";
+  S.state = "start"; explain(S.bulb ? (S.bridge ? "flow" : "nobridge") : "start");
+};
+$("bridge").onchange = () => { S.bridge = $("bridge").checked; explain(S.bridge ? "bridge" : "nobridge"); };
+
+// ---------------------------------------------------------------- first-visit tour
+const TOUR = [
+  ["#box", "Two half-cells: a metal electrode in a solution of its own ions. A wire with a voltmeter connects the electrodes, and a salt bridge connects the solutions."],
+  ["#ctl", "Choose the metal and the ion concentration for each side. Connect the bulb to let current flow, or take the salt bridge out."],
+  ["#infocard", "The half-reactions, the overall reaction, E°<sub>cell</sub>, ΔG°, K and the cell potential right now. The explanation underneath follows what you do."]
+];
+const tour = {i: 0, els: null, auto: true};
+function tourSeen() { try { return localStorage.getItem("chemsim-galv-tour") === "1"; } catch (e) { return false; } }
+function tourMark() { try { localStorage.setItem("chemsim-galv-tour", "1"); } catch (e) { /* private mode */ } }
+function tourStart() {
+  tourEnd(false); tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card); tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOUR.length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const [sel, text] = TOUR[tour.i], n = TOUR.length, {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  card.innerHTML = `<div class="tstep">Galvanic cell · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12; if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) { if (!tour.els) return; if (markSeen) tourMark(); for (const e of Object.values(tour.els)) e.remove(); tour.els = null; }
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
+// ---------------------------------------------------------------- run
+let last = performance.now(), pT = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  run(dt); draw(dt);
+  if ((pT -= dt) <= 0) {
+    pT = 0.25; panel(); showC();
+    if (flowing()) {
+      const E = cell().E;
+      if (S.state === "start") { S.state = "flow"; S.Estart = E; }
+      else if (E < 0.0005 && S.state !== "dead") { S.state = "dead"; explain("dead"); }
+      else if (S.state === "flow" && E < 0.93 * S.Estart) { S.state = "falling"; explain("falling"); }
+    }
+  }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("predict") === "1") S.predict = true;
+  const l = q.get("left"), r = q.get("right");
+  $("mL").value = l && MET[l] ? l : "Zn"; $("mR").value = r && MET[r] ? r : "Cu";
+  $("tour-btn").onclick = tourStart;
+  newCell();
+  if (q.get("tour") !== "0" && !tourSeen()) setTimeout(tourStart, 500);
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>

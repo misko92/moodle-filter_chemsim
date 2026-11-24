@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beer's Law</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+select, input[type=text] { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+input[type=text] { width: 8em; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type=range] { flex: 1 1 160px; height: 32px; min-width: 140px; }
+input[type=range]:disabled { opacity: .4; }
+.val { font-weight: bold; min-width: 6.5em; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+table.stats { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+table.stats td, table.stats th { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+table.stats th { font-size: 12px; color: var(--muted); font-weight: normal; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 15px; line-height: 1.6; margin-top: 8px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.ok { color: #047857; } .bad { color: #b91c1c; }
+.mode { display: none; } .mode.active { display: block; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Beer's Law and Spectrophotometry</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="explore">Explore</button>
+  <button data-mode="calibrate">Calibration curve</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 460px" id="boxcard">
+    <canvas id="box" width="520" height="250" aria-label="Spectrophotometer: light passes through the sample to a detector"></canvas>
+    <div class="ctl" id="ctl">
+      <b>Solution</b>
+      <div><select id="sol"></select></div>
+      <b>Concentration</b>
+      <div><input type="range" id="conc" min="0" max="1" step="0.05" value="0.5"><span class="val" id="concv"></span></div>
+      <b>Path length</b>
+      <div><button data-b="0.5">0.50 cm</button><button data-b="1">1.00 cm</button><button data-b="2">2.00 cm</button></div>
+      <b>Wavelength</b>
+      <div><input type="range" id="wl" min="380" max="850" step="1" value="525"><span class="val" id="wlv"></span><button id="b-max">Set to λ<sub>max</sub></button></div>
+      <b class="ca"></b>
+      <div class="ca"><button id="b-rec" class="primary">● Record standard</button><button id="b-clear">Clear</button><button id="b-unk">🧪 Measure the unknown</button></div>
+    </div>
+    <div class="big" id="readout"></div>
+  </div>
+
+  <div class="card" style="flex:1 1 500px" id="graphcard">
+    <h2 id="gtitle"></h2>
+    <canvas id="graph" width="520" height="280" aria-label="Graph"></canvas>
+    <div class="legend" id="glegend"></div>
+    <section class="mode" id="m-calibrate">
+      <table class="stats" id="table"></table>
+      <div class="ctl" id="answer" style="display:none">
+        <b>Concentration of the unknown</b>
+        <div><input type="text" id="q-c" inputmode="decimal" placeholder="value"><span id="q-unit"></span><button id="b-check" class="primary">Check</button></div>
+      </div>
+      <div class="why" id="feedback" style="display:none"></div>
+    </section>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note" id="foot">Absorption spectra are simplified smooth curves with realistic λ<sub>max</sub> and molar absorptivity (ε at λ<sub>max</sub>): KMnO₄ 525 nm, 2 400 M⁻¹ cm⁻¹; Blue 1 dye 630 nm, 130 000 M⁻¹ cm⁻¹; CuSO₄ 810 nm, 12 M⁻¹ cm⁻¹.</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+// ---------------------------------------------------------------- solutions: eps(λ) as a sum of Gaussian bands
+const SOL = {
+  KMnO4: {f: "KMnO₄ (purple)", unit: "×10⁻⁴ M", scale: 1e-4, cmax: 4, step: 0.25, def: 2, lmax: 525, bands: [[525, 2400, 32]], col: [126, 34, 160]},
+  blue1: {f: "Blue 1 food dye", unit: "µM", scale: 1e-6, cmax: 10, step: 0.5, def: 4, lmax: 630, bands: [[630, 128000, 30], [575, 16000, 18]], col: [37, 99, 235]},
+  CuSO4: {f: "CuSO₄ (blue)", unit: "M", scale: 1, cmax: 0.12, step: 0.01, def: 0.06, lmax: 810, bands: [[810, 12, 110]], col: [56, 160, 220]}
+};
+function eps(k, l) { return SOL[k].bands.reduce((t, [c, h, w]) => t + h * Math.exp(-0.5 * ((l - c) / w) ** 2), 0); }
+const epsMax = k => { let m = 0; for (let l = 380; l <= 850; l++) m = Math.max(m, eps(k, l)); return m; };
+const lmaxOf = k => { let m = 0, lb = 380; for (let l = 380; l <= 850; l++) { const e = eps(k, l); if (e > m) { m = e; lb = l; } } return lb; };
+const S = {mode: "explore", sol: "KMnO4", c: 2, b: 1, wl: 525, recs: [], unk: null, ph: []};
+const absb = (c = S.c) => eps(S.sol, S.wl) * S.b * c * SOL[S.sol].scale;
+function rgbOf(l) {
+  let r = 0, g = 0, b = 0;
+  if (l < 440) { r = (440 - l) / 60; b = 1; } else if (l < 490) { g = (l - 440) / 50; b = 1; } else if (l < 510) { g = 1; b = (510 - l) / 20; }
+  else if (l < 580) { r = (l - 510) / 70; g = 1; } else if (l < 645) { r = 1; g = (645 - l) / 65; } else if (l <= 780) { r = 1; } else { r = 0.55; g = 0.1; b = 0.1; }
+  let f = l < 420 ? 0.3 + 0.7 * (l - 380) / 40 : l > 700 ? Math.max(0.35, 0.3 + 0.7 * (780 - Math.min(l, 780)) / 80) : 1;
+  return [Math.round(255 * r * f), Math.round(255 * g * f), Math.round(255 * b * f)];
+}
+const fmt = v => v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v.toFixed(3);
+
+// ---------------------------------------------------------------- spectrophotometer drawing
+const W = 520, H = 250, CUX0 = 250, CY = 110;
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, W, H); hiDPI(graph, 520, 280);
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function cuvW() { return 40 * S.b; }
+function step(dt) {
+  // photons: some are absorbed inside the cuvette, so the fraction that reaches the detector is T = 10^-A
+  const A = S.unk && S.mode === "calibrate" ? S.unk.A : absb();
+  if (Math.random() < dt * 30) S.ph.push({x: 80, y: CY + rnd(-8, 8), dead: false, absAt: Math.random() < 1 - Math.pow(10, -A) ? CUX0 + Math.random() * cuvW() : 1e9});
+  for (const p of S.ph) { p.x += 160 * dt; if (p.x >= p.absAt) p.dead = true; if (p.x > 470) p.dead = true; }
+  S.ph = S.ph.filter(p => !p.dead);
+}
+function draw() {
+  const g = bg, unk = S.mode === "calibrate" && S.unk, A = unk ? S.unk.A : absb(), T = Math.pow(10, -A), [r, gr, b] = rgbOf(S.wl), sc = SOL[S.sol].col;
+  g.clearRect(0, 0, W, H);
+  // lamp + prism/grating
+  g.fillStyle = "#fde68a"; g.beginPath(); g.arc(30, CY, 18, 0, 6.283); g.fill(); g.strokeStyle = "#a16207"; g.lineWidth = 2; g.stroke();
+  g.fillStyle = "#334155"; g.font = "11px Arial"; g.textAlign = "center"; g.fillText("light", 30, CY + 34);
+  g.fillStyle = "#cbd5e1"; g.beginPath(); g.moveTo(70, CY + 22); g.lineTo(100, CY - 22); g.lineTo(130, CY + 22); g.closePath(); g.fill(); g.strokeStyle = "#64748b"; g.stroke();
+  g.fillStyle = "#334155"; g.fillText(`${S.wl} nm only`, 100, CY + 38);
+  // beam before / inside / after the cuvette
+  const cw = cuvW(), cx1 = CUX0 + cw;
+  g.fillStyle = `rgba(${r},${gr},${b},.85)`; g.fillRect(130, CY - 9, CUX0 - 130, 18);
+  const grd = g.createLinearGradient(CUX0, 0, cx1, 0); grd.addColorStop(0, `rgba(${r},${gr},${b},.85)`); grd.addColorStop(1, `rgba(${r},${gr},${b},${(0.85 * T).toFixed(3)})`);
+  g.fillStyle = grd; g.fillRect(CUX0, CY - 9, cw, 18);
+  g.fillStyle = `rgba(${r},${gr},${b},${(0.85 * T).toFixed(3)})`; g.fillRect(cx1, CY - 9, 450 - cx1, 18);
+  // cuvette with solution (darker when more concentrated)
+  const cfr = unk ? S.unk.c / SOL[S.sol].cmax : S.c / SOL[S.sol].cmax;
+  g.fillStyle = `rgba(${sc[0]},${sc[1]},${sc[2]},${(0.08 + 0.72 * cfr).toFixed(2)})`; g.fillRect(CUX0, CY - 50, cw, 100);
+  g.strokeStyle = "#475569"; g.lineWidth = 2.5; g.strokeRect(CUX0, CY - 55, cw, 105);
+  g.fillStyle = "#334155"; g.font = "11px Arial"; g.fillText(`b = ${S.b.toFixed(2)} cm`, CUX0 + cw / 2, CY + 68);
+  if (unk) { g.font = "bold 22px Arial"; g.fillStyle = "#fff"; g.fillText("?", CUX0 + cw / 2, CY - 22); }
+  for (const p of S.ph) { g.beginPath(); g.arc(p.x, p.y, 2.5, 0, 6.283); g.fillStyle = "#fff"; g.fill(); }
+  // detector
+  g.fillStyle = "#334155"; g.fillRect(452, CY - 30, 16, 60); g.fillStyle = "#334155"; g.font = "11px Arial"; g.fillText("detector", 460, CY + 46);
+  g.font = "bold 16px Arial"; g.textAlign = "left"; g.fillStyle = "#1f2937";
+  g.fillText(`A = ${A.toFixed(3)}`, 300, 212); g.font = "14px Arial"; g.fillText(`%T = ${(100 * T).toFixed(1)}%`, 300, 234);
+  g.fillStyle = "#6b7280"; g.font = "12px Arial"; g.fillText(`I/I₀ = ${T.toFixed(3)}`, 410, 234);
+  g.textAlign = "left"; g.fillStyle = "#334155"; g.font = "12px Arial"; g.fillText(unk ? "unknown sample" : SOL[S.sol].f, 20, 212);
+  g.fillText(unk ? "concentration = ?" : `c = ${S.c} ${SOL[S.sol].unit}`, 20, 230);
+}
+// ---------------------------------------------------------------- graphs
+const GX0 = 56, GX1 = 505, GY0 = 14, GY1 = 236;
+function axes(g, xr, yr, xl, yl, xs, ys) {
+  const X = v => GX0 + (v - xr[0]) / (xr[1] - xr[0]) * (GX1 - GX0), Y = v => GY1 - (v - yr[0]) / (yr[1] - yr[0]) * (GY1 - GY0);
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let v = yr[0]; v <= yr[1] + 1e-9; v += ys) { g.beginPath(); g.moveTo(GX0, Y(v)); g.lineTo(GX1, Y(v)); g.stroke(); g.fillText(+v.toFixed(3), GX0 - 5, Y(v) + 4); }
+  g.textAlign = "center"; for (let v = xr[0]; v <= xr[1] + 1e-9; v += xs) { g.beginPath(); g.moveTo(X(v), GY0); g.lineTo(X(v), GY1); g.stroke(); g.fillText(+v.toFixed(3), X(v), GY1 + 15); }
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, GY0); g.lineTo(GX0, GY1); g.lineTo(GX1, GY1); g.stroke();
+  g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText(xl, (GX0 + GX1) / 2, GY1 + 36);
+  g.save(); g.translate(14, (GY0 + GY1) / 2); g.rotate(-Math.PI / 2); g.fillText(yl, 0, 0); g.restore();
+  return {X, Y};
+}
+function niceTop(v) { for (const s of [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.5, 2, 2.5, 3, 4, 5]) if (v <= s) return s; return Math.ceil(v); }
+function drawSpectrum() {
+  const g = gg; g.clearRect(0, 0, 520, 280);
+  const k = S.sol, sc = SOL[k].scale, Amax = epsMax(k) * S.b * Math.max(S.c, 1e-9) * sc, top = niceTop(Math.max(0.2, Amax * 1.1));
+  // rainbow strip under the x axis
+  for (let l = 380; l <= 850; l += 2) { const [r, gr, b] = rgbOf(l); g.fillStyle = `rgb(${r},${gr},${b})`; g.fillRect(GX0 + (l - 380) / 470 * (GX1 - GX0), GY1 + 1, 3, 4); }
+  const {X, Y} = axes(g, [380, 850], [0, top], "Wavelength (nm)", "Absorbance", 50, top / 5);
+  g.strokeStyle = `rgb(${SOL[k].col})`; g.lineWidth = 2.5; g.beginPath();
+  for (let l = 380; l <= 850; l += 2) { const y = Y(Math.min(top * 1.05, eps(k, l) * S.b * S.c * sc)); l === 380 ? g.moveTo(X(l), y) : g.lineTo(X(l), y); } g.stroke();
+  const A = absb(); g.strokeStyle = "#dc2626"; g.setLineDash([5, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(X(S.wl), GY0); g.lineTo(X(S.wl), GY1); g.stroke(); g.setLineDash([]);
+  g.beginPath(); g.arc(X(S.wl), Y(Math.min(top, A)), 6, 0, 6.283); g.fillStyle = "#dc2626"; g.fill();
+  const lm = lmaxOf(k); g.fillStyle = "#1f2937"; g.font = "bold 12px Arial"; g.textAlign = "center"; g.fillText(`λmax ≈ ${lm} nm`, X(lm), Y(Math.min(top, Amax)) - 8);
+}
+function fitLine() {
+  const n = S.recs.length; if (n < 2) return null;
+  const mx = S.recs.reduce((t, r) => t + r.c, 0) / n, my = S.recs.reduce((t, r) => t + r.A, 0) / n;
+  let sxx = 0, sxy = 0, syy = 0; for (const r of S.recs) { sxx += (r.c - mx) ** 2; sxy += (r.c - mx) * (r.A - my); syy += (r.A - my) ** 2; }
+  if (sxx < 1e-12) return null; const m = sxy / sxx; return {m, b: my - m * mx, r2: syy ? sxy * sxy / (sxx * syy) : 1};
+}
+function drawCalib() {
+  const g = gg; g.clearRect(0, 0, 520, 280);
+  const k = S.sol, cm = SOL[k].cmax, Amax = Math.max(0.2, ...S.recs.map(r => r.A), absb(cm) * 1.05, S.unk ? S.unk.A : 0);
+  const top = niceTop(Amax * 1.05), {X, Y} = axes(g, [0, cm], [0, top], `Concentration (${SOL[k].unit})`, "Absorbance", cm / 4, top / 5);
+  const f = fitLine();
+  if (f) {
+    g.save(); g.beginPath(); g.rect(GX0, GY0, GX1 - GX0, GY1 - GY0); g.clip(); g.strokeStyle = "#059669"; g.setLineDash([7, 4]); g.lineWidth = 2;
+    g.beginPath(); g.moveTo(X(0), Y(f.b)); g.lineTo(X(cm), Y(f.b + f.m * cm)); g.stroke(); g.setLineDash([]); g.restore();
+    g.fillStyle = "#047857"; g.font = "bold 12px Arial"; g.textAlign = "left"; g.fillText(`A = ${f.m.toPrecision(4)} c ${f.b >= 0 ? "+" : "−"} ${Math.abs(f.b).toFixed(4)}   R² = ${f.r2.toFixed(4)}`, GX0 + 8, GY0 + 14);
+  }
+  for (const r of S.recs) { g.beginPath(); g.arc(X(r.c), Y(r.A), 5.5, 0, 6.283); g.fillStyle = "#1d4ed8"; g.fill(); }
+  if (S.unk) {
+    g.strokeStyle = "#dc2626"; g.setLineDash([4, 3]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, Y(S.unk.A)); g.lineTo(GX1, Y(S.unk.A)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "#b91c1c"; g.font = "bold 12px Arial"; g.textAlign = "right"; g.fillText(`unknown: A = ${S.unk.A.toFixed(3)}`, GX1 - 4, Y(S.unk.A) - 5);
+  } else { g.beginPath(); g.arc(X(S.c), Y(absb()), 7, 0, 6.283); g.strokeStyle = "#dc2626"; g.lineWidth = 2.5; g.stroke(); }
+}
+function table() {
+  if (!S.recs.length) { $("table").innerHTML = `<tr><td class="note" style="border:0">No standards yet. Set a concentration, press <b>Record standard</b>, and repeat for at least four concentrations.</td></tr>`; return; }
+  $("table").innerHTML = `<tr><th>Standard</th><th>c (${SOL[S.sol].unit})</th><th>A</th><th>A / c</th></tr>` + S.recs.map((r, i) => `<tr><td>${i + 1}</td><td>${r.c}</td><td>${r.A.toFixed(3)}</td><td>${r.c ? (r.A / r.c).toPrecision(3) : "—"}</td></tr>`).join("");
+}
+// ---------------------------------------------------------------- text
+function readout() {
+  const k = S.sol, e = eps(k, S.wl), A = absb();
+  if (S.mode === "calibrate" && S.unk) { $("readout").innerHTML = `Unknown sample at ${S.wl} nm, b = ${S.b.toFixed(2)} cm: <b>A = ${S.unk.A.toFixed(3)}</b>. Use your calibration line to find its concentration.`; return; }
+  $("readout").innerHTML = `A = εbc = (${e >= 100 ? Math.round(e).toLocaleString("en-US") : e.toFixed(2)} M⁻¹cm⁻¹)(${S.b.toFixed(2)} cm)(${(S.c * SOL[k].scale).toExponential(2).replace("e", "×10^").replace(/\^([+-]?\d+)/, (m, p) => `<sup>${+p}</sup>`)} M) = <b>${A.toFixed(3)}</b>`;
+}
+function explain(kind) {
+  const k = S.sol, lm = lmaxOf(k);
+  const T = {
+    start: "A spectrophotometer shines light of <b>one wavelength</b> through the sample and measures how much gets through. Absorbance A = −log(I/I₀). <b>Beer's law: A = εbc</b>: absorbance is proportional to the concentration c and to the path length b. ε (molar absorptivity) depends on the substance and the wavelength.",
+    conc: "Doubling the concentration doubles the number of absorbing particles in the light's path, so the absorbance <b>doubles</b> (A ∝ c). The transmitted light does not halve: %T = 10<sup>−A</sup>.",
+    path: "A longer path means the light passes more absorbing particles, so A increases in proportion: doubling b doubles A.",
+    wl: Math.abs(S.wl - lm) <= 8 ? `At λ<sub>max</sub> (${lm} nm) the solution absorbs most strongly: the absorbance changes most for a given change in concentration, so this is the best wavelength for measurements.`
+      : `Away from λ<sub>max</sub> the solution absorbs less, so A is smaller and less sensitive to concentration. A colored solution absorbs the <b>complementary</b> color: ${SOL[k].f} absorbs mainly around ${lm} nm.`,
+    sol: `${SOL[k].f}: λ<sub>max</sub> ≈ ${lm} nm, ε ≈ ${Math.round(epsMax(k)).toLocaleString("en-US")} M⁻¹cm⁻¹. ${k === "blue1" ? "A dye absorbs so strongly that micromolar concentrations are enough." : k === "CuSO4" ? "Cu²⁺ absorbs weakly (small ε), so much higher concentrations are needed for the same absorbance." : ""}`,
+    calib: "Make a <b>calibration curve</b>: measure the absorbance of several standards of known concentration at one wavelength (λ<sub>max</sub> is best). The points should lie on a straight line through the origin; its slope is εb. Then measure an unknown and use the line to find its concentration.",
+    unk: "Read across from the unknown's absorbance to your line, or solve A = (slope)c + intercept for c."
+  };
+  $("why").innerHTML = T[kind] || T.start;
+}
+// ---------------------------------------------------------------- controls
+$("sol").innerHTML = Object.keys(SOL).map(k => `<option value="${k}">${SOL[k].f}</option>`).join("");
+function setSol(k) {
+  S.sol = k; const s = SOL[k]; Object.assign($("conc"), {min: 0, max: s.cmax, step: s.step}); S.c = s.def; $("conc").value = s.def;
+  S.wl = lmaxOf(k); $("wl").value = S.wl; S.recs = []; S.unk = null; $("answer").style.display = "none"; $("feedback").style.display = "none"; show();
+}
+function show() {
+  $("concv").textContent = `${S.c} ${SOL[S.sol].unit}`; $("wlv").textContent = `${S.wl} nm`;
+  for (const b of document.querySelectorAll("[data-b]")) b.classList.toggle("on", +b.dataset.b === S.b);
+  $("conc").disabled = !!(S.mode === "calibrate" && S.unk); readout(); table();
+}
+$("sol").onchange = () => { setSol($("sol").value); explain(S.mode === "calibrate" ? "calib" : "sol"); };
+$("conc").addEventListener("input", e => { S.c = +(+e.target.value).toFixed(4); show(); if (S.mode === "explore") explain("conc"); });
+for (const b of document.querySelectorAll("[data-b]")) b.onclick = () => { S.b = +b.dataset.b; if (S.mode === "calibrate") { S.recs = []; if (S.unk) S.unk.A = absb(S.unk.c); } show(); explain(S.mode === "calibrate" ? "calib" : "path"); };
+$("wl").addEventListener("input", e => { S.wl = +e.target.value; if (S.mode === "calibrate") { S.recs = []; if (S.unk) S.unk.A = absb(S.unk.c); } show(); explain("wl"); });
+$("b-max").onclick = () => { S.wl = lmaxOf(S.sol); $("wl").value = S.wl; if (S.mode === "calibrate") { S.recs = []; if (S.unk) S.unk.A = absb(S.unk.c); } show(); explain("wl"); };
+$("b-rec").onclick = () => { if (S.unk) { S.unk = null; $("answer").style.display = "none"; $("feedback").style.display = "none"; } if (!S.recs.some(r => r.c === S.c)) S.recs.push({c: S.c, A: absb()}); S.recs.sort((a, b) => a.c - b.c); show(); explain("calib"); };
+$("b-clear").onclick = () => { S.recs = []; S.unk = null; $("answer").style.display = "none"; $("feedback").style.display = "none"; show(); explain("calib"); };
+$("b-unk").onclick = () => {
+  const s = SOL[S.sol], c = +(s.cmax * (0.15 + 0.7 * Math.random())).toPrecision(3);
+  S.unk = {c, A: absb(c)}; $("answer").style.display = ""; $("feedback").style.display = "none"; $("q-c").value = ""; $("q-unit").textContent = s.unit; show(); explain("unk");
+};
+$("b-check").onclick = () => {
+  const v = parseFloat($("q-c").value.replace(",", ".")), u = S.unk, fb = $("feedback"); fb.style.display = "";
+  if (!isFinite(v)) { fb.innerHTML = "Enter a number (in " + SOL[S.sol].unit + ")."; return; }
+  const ok = Math.abs(v - u.c) <= 0.05 * u.c, f = fitLine();
+  fb.innerHTML = ok ? `<span class="ok">✓ Correct: the unknown is ${u.c} ${SOL[S.sol].unit}.</span> Press <b>Measure the unknown</b> again for another one.`
+    : `<span class="bad">✗ Not quite.</span> ${f ? `From your line: c = (A − intercept)/slope = (${u.A.toFixed(3)} − ${f.b.toFixed(4)}) / ${f.m.toPrecision(4)} = ${((u.A - f.b) / f.m).toPrecision(3)} ${SOL[S.sol].unit}.` : "Record at least two standards first so you have a line to use."}`;
+};
+function setMode(m) {
+  S.mode = m; S.unk = null;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  for (const e of document.querySelectorAll(".ca")) e.style.display = m === "calibrate" ? "" : "none";
+  $("gtitle").textContent = m === "explore" ? "Absorbance spectrum" : "Calibration curve (Beer's law plot)";
+  $("glegend").innerHTML = m === "explore" ? `<span><span class="dot" style="background:#dc2626"></span>the wavelength being used</span>` : `<span><span class="dot" style="background:#1d4ed8"></span>standards</span><span style="color:#059669">- - best-fit line</span><span><span class="dot" style="background:#fff;border:2px solid #dc2626"></span>current sample</span>`;
+  $("answer").style.display = "none"; $("feedback").style.display = "none";
+  show(); explain(m === "explore" ? "start" : "calib");
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+// ---------------------------------------------------------------- tours
+const TOURS = {
+  explore: [
+    ["#box", "Light of one wavelength passes through the sample in the cuvette. Some of it is absorbed; the detector measures what gets through. The white dots are photons."],
+    ["#ctl", "Change the solution, its concentration, the path length (cuvette width) and the wavelength."],
+    ["#graphcard", "The absorbance spectrum of the solution. The red line is the wavelength you are using: λ<sub>max</sub>, the highest point, is the best choice."]
+  ],
+  calibrate: [
+    ["#ctl", "Record standards: set a concentration, press <b>Record standard</b>, and repeat. Then measure the unknown."],
+    ["#graphcard", "Your standards make a straight line (Beer's law). Use it to find the concentration of the unknown and press <b>Check</b>."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-beer-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {explore: "Explore", calibrate: "Calibration curve"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+// ---------------------------------------------------------------- run
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  step(dt); draw(); S.mode === "explore" ? drawSpectrum() : drawCalib();
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const s = q.get("solution"); setSol(s && SOL[s] ? s : "KMnO4"); $("sol").value = S.sol;
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "calibrate" ? "calibrate" : "explore");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>

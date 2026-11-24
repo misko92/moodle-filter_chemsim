@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vapor Pressure and Phase Changes</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type=range] { flex: 1 1 160px; height: 32px; min-width: 140px; }
+.val { font-weight: bold; min-width: 5.5em; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 15px; line-height: 1.5; margin-top: 8px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.mode { display: none; } .mode.active { display: block; }
+.bars { display: grid; grid-template-columns: 9.5em 1fr 4.5em; gap: 6px 8px; align-items: center; font-size: 13px; margin-top: 8px; }
+.bar { height: 14px; border-radius: 7px; background: #e5e7eb; overflow: hidden; } .bar > i { display: block; height: 100%; border-radius: 7px; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Vapor Pressure and Phase Changes</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="vapor">Vapor pressure</button>
+  <button data-mode="heating">Heating curve</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 460px" id="boxcard">
+    <canvas id="box" width="520" height="360" aria-label="Molecules of a liquid and its vapor in a closed container"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="ctl" id="ctl">
+      <b class="va">Liquid</b>
+      <div class="va"><select id="liq"></select></div>
+      <b class="va">Temperature</b>
+      <div class="va"><input type="range" id="temp" min="0" max="100" step="1" value="25"><span class="val" id="tempv"></span></div>
+      <b class="va">Container</b>
+      <div class="va"><button id="b-vol">⇕ Double the volume</button><button id="b-empty">Pump out the vapor</button></div>
+      <b class="he">Heater</b>
+      <div class="he"><button id="b-heat" class="primary">▶ Heat</button><button id="b-cool">❄ Cool</button><button id="b-stop">❚❚ Pause</button><button id="b-hreset">↺ Start over</button></div>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1 1 500px" id="graphcard">
+    <section class="mode" id="m-vapor">
+      <h2>Vapor pressure vs temperature</h2>
+      <canvas id="graph" width="520" height="260" aria-label="Vapor pressure curves"></canvas>
+      <div class="legend" id="glegend"></div>
+      <div class="bars" id="rates">
+        <span>Evaporation rate</span><div class="bar"><i id="re" style="background:#f97316"></i></div><span id="rev"></span>
+        <span>Condensation rate</span><div class="bar"><i id="rc" style="background:#0ea5e9"></i></div><span id="rcv"></span>
+      </div>
+      <canvas id="ptime" width="520" height="120" aria-label="Pressure in the container over time" style="margin-top:8px"></canvas>
+    </section>
+    <section class="mode" id="m-heating">
+      <h2>Heating curve: 18.0 g (1.00 mol) of water</h2>
+      <canvas id="hgraph" width="520" height="300" aria-label="Temperature against heat added"></canvas>
+      <div class="bars" id="hbars">
+        <span>Average kinetic energy</span><div class="bar"><i id="hke" style="background:#ef4444"></i></div><span id="hkev"></span>
+        <span>Attractions overcome</span><div class="bar"><i id="hpe" style="background:#8b5cf6"></i></div><span id="hpev"></span>
+      </div>
+      <div class="big" id="hcalc"></div>
+    </section>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note" id="foot"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const R = 8.314;
+// ---------------------------------------------------------------- liquids (Clausius–Clapeyron from the normal boiling point)
+const LIQ = {
+  ether: {f: "diethyl ether", dH: 26.5, Tb: 307.8, col: "#f59e0b", imf: "only London dispersion forces and weak dipole–dipole forces (no hydrogen bonding)"},
+  ethanol: {f: "ethanol", dH: 38.6, Tb: 351.4, col: "#8b5cf6", imf: "hydrogen bonding (one O–H per molecule) plus dispersion forces"},
+  water: {f: "water", dH: 40.7, Tb: 373.15, col: "#0ea5e9", imf: "strong hydrogen bonding (each molecule can form up to four hydrogen bonds)"}
+};
+const VP = (k, Tc) => Math.exp(-LIQ[k].dH * 1000 / R * (1 / (Tc + 273.15) - 1 / LIQ[k].Tb));
+const S = {mode: "vapor", liq: "ether", T: 25, V: 1, nv: 0, vap: [], liqP: [], fx: [], hist: [], hT: 0, paused: false,
+  q: 0, dir: 0, hparts: []};
+const PER = 40;      // drawn vapor molecules per atm (at the small volume, 25 °C)
+const nEq = () => VP(S.liq, S.T) * S.V * 298 / (S.T + 273.15);
+const Pnow = () => S.nv * (S.T + 273.15) / 298 / S.V;
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+// ---------------------------------------------------------------- vapor tab: container geometry
+const W = 520, H = 360, CX0 = 30, CX1 = 330, LTOP = 290, LBOT = 340;
+const vtop = () => LTOP - 120 * S.V;
+function makeLiquid() {
+  S.liqP = []; for (let i = 0; i < 90; i++) S.liqP.push({x: rnd(CX0 + 6, CX1 - 6), y: rnd(LTOP + 5, LBOT - 5), hx: 0, hy: 0});
+  for (const p of S.liqP) { p.hx = p.x; p.hy = p.y; }
+}
+function speed() { return 40 * Math.sqrt((S.T + 273.15) / 298); }
+function newVapor(fromSurface) {
+  const a = fromSurface ? rnd(-2.6, -0.5) : rnd(0, 6.283), sp = speed() * rnd(0.6, 1.4);
+  return {x: rnd(CX0 + 8, CX1 - 8), y: fromSurface ? LTOP - 4 : rnd(vtop() + 6, LTOP - 8), vx: sp * Math.cos(a), vy: sp * Math.sin(a), fl: fromSurface ? 1 : 0, sink: 0};
+}
+function stepVapor(dt) {
+  const ne = nEq(), tau = 1.5 * S.V, re = ne / tau, rc = S.nv / tau;   // in "vapor amount per second"
+  S.nv += (re - rc) * dt; S.re = re; S.rc = rc;
+  // visual exchange events at the surface, both scaled the same way
+  const sc = Math.min(1, 9 / Math.max(PER * re, PER * rc, 1e-9));
+  if (Math.random() < PER * re * sc * dt) { S.vap.push(newVapor(true)); S.fx.push({x: S.vap[S.vap.length - 1].x, y: LTOP, t: 1, up: true}); }
+  if (Math.random() < PER * rc * sc * dt && S.vap.length) {
+    let best = null; for (const p of S.vap) if (!p.sink && (!best || p.y > best.y)) best = p;
+    if (best) best.sink = 1;
+  }
+  // keep the number drawn close to the real amount
+  const want = Math.min(170, Math.round(PER * S.nv)), live = S.vap.filter(p => !p.sink).length;
+  if (live < want - 1) S.vap.push(newVapor(true));
+  if (live > want + 1) { const c = S.vap.filter(p => !p.sink); c[Math.floor(Math.random() * c.length)].sink = 1; }
+  const top = vtop();
+  for (const p of S.vap) {
+    if (p.sink) { p.vy = Math.abs(p.vy) + 60; p.vx *= 0.9; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.x < CX0 + 5) { p.x = CX0 + 5; p.vx = Math.abs(p.vx); } if (p.x > CX1 - 5) { p.x = CX1 - 5; p.vx = -Math.abs(p.vx); }
+    if (p.y < top + 5) { p.y = top + 5; p.vy = Math.abs(p.vy); }
+    if (p.y > LTOP - 4) { if (p.sink) { p.gone = true; S.fx.push({x: p.x, y: LTOP, t: 1, up: false}); } else { p.y = LTOP - 4; p.vy = -Math.abs(p.vy); } }
+    if (p.fl) p.fl = Math.max(0, p.fl - dt * 1.5);
+  }
+  S.vap = S.vap.filter(p => !p.gone);
+  for (const f of S.fx) f.t -= dt * 2; S.fx = S.fx.filter(f => f.t > 0);
+  const amp = 1.2 + 2 * (S.T / 100);
+  for (const p of S.liqP) { p.x = p.hx + rnd(-amp, amp); p.y = p.hy + rnd(-amp, amp); }
+  S.hT += dt; if (S.hT > 0.25) { S.hT = 0; S.hist.push(Pnow()); if (S.hist.length > 120) S.hist.shift(); }
+}
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d"), pt = $("ptime"), pg = pt.getContext("2d"), hg = $("hgraph"), hgg = hg.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, W, H); hiDPI(graph, 520, 260); hiDPI(pt, 520, 120); hiDPI(hg, 520, 300);
+function drawVapor() {
+  const g = bg, L = LIQ[S.liq], top = vtop();
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = "#f8fafc"; g.fillRect(CX0, top, CX1 - CX0, LTOP - top);
+  g.fillStyle = L.col + "33"; g.fillRect(CX0, LTOP, CX1 - CX0, LBOT - LTOP);
+  g.strokeStyle = "#475569"; g.lineWidth = 4; g.strokeRect(CX0 - 2, top - 2, CX1 - CX0 + 4, LBOT - top + 4);
+  for (const p of S.liqP) { g.beginPath(); g.arc(p.x, p.y, 4, 0, 6.283); g.fillStyle = L.col; g.fill(); }
+  for (const f of S.fx) { g.beginPath(); g.arc(f.x, f.y, 5 + 9 * (1 - f.t), 0, 6.283); g.strokeStyle = f.up ? `rgba(249,115,22,${f.t})` : `rgba(14,165,233,${f.t})`; g.lineWidth = 2; g.stroke(); }
+  for (const p of S.vap) {
+    if (p.fl) { g.beginPath(); g.arc(p.x, p.y, 9, 0, 6.283); g.fillStyle = `rgba(249,115,22,${0.35 * p.fl})`; g.fill(); }
+    g.beginPath(); g.arc(p.x, p.y, 4, 0, 6.283); g.fillStyle = L.col; g.fill();
+  }
+  // gauge
+  const P = Pnow(), cx = 430, cy = 110, rr = 56, PM = 2;
+  g.beginPath(); g.arc(cx, cy, rr, 0, 6.283); g.fillStyle = "#fff"; g.fill(); g.strokeStyle = "#334155"; g.lineWidth = 4; g.stroke();
+  const ang = v => Math.PI * (0.75 + 1.5 * Math.min(v, PM * 1.04) / PM);
+  g.lineWidth = 1.5; g.font = "10px Arial"; g.textAlign = "center"; g.fillStyle = "#334155";
+  for (let v = 0; v <= PM + 1e-9; v += 0.25) { const a = ang(v), l = Math.abs(v % 1) < 1e-9 ? 10 : 5; g.beginPath(); g.moveTo(cx + Math.cos(a) * (rr - 3), cy + Math.sin(a) * (rr - 3)); g.lineTo(cx + Math.cos(a) * (rr - 3 - l), cy + Math.sin(a) * (rr - 3 - l)); g.strokeStyle = "#475569"; g.stroke(); if (Math.abs(v % 1) < 1e-9) g.fillText(v, cx + Math.cos(a) * (rr - 21), cy + Math.sin(a) * (rr - 21) + 4); }
+  const a = ang(P); g.strokeStyle = "#dc2626"; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * (rr - 10), cy + Math.sin(a) * (rr - 10)); g.stroke();
+  g.fillStyle = "#334155"; g.beginPath(); g.arc(cx, cy, 5, 0, 6.283); g.fill(); g.font = "11px Arial"; g.fillText("atm", cx, cy + 24);
+  g.font = "bold 15px Arial"; g.fillStyle = "#1f2937"; g.fillText(`${P < 0.1 ? P.toFixed(3) : P.toFixed(2)} atm`, cx, cy + rr + 22);
+  g.font = "13px Arial"; g.fillText(`(${Math.round(P * 760)} torr)`, cx, cy + rr + 40);
+  g.fillText(`${S.T} °C`, cx, cy + rr + 66);
+  const eq = Math.abs(S.re - S.rc) < 0.03 * Math.max(S.re, 1e-6) + 0.002;
+  g.font = "bold 13px Arial"; g.fillStyle = eq ? "#047857" : "#b45309"; g.fillText(eq ? "equilibrium" : S.re > S.rc ? "evaporating…" : "condensing…", cx, cy + rr + 90);
+  if (S.vap.length >= 170) { g.font = "11px Arial"; g.fillStyle = "#6b7280"; g.fillText("(not every vapor molecule is drawn)", 180, top - 8); }
+}
+const GX0 = 52, GX1 = 505, GY0 = 12, GY1 = 220;
+function drawVPGraph() {
+  const g = gg; g.clearRect(0, 0, 520, 260);
+  const PM = 2, X = t => GX0 + t / 100 * (GX1 - GX0), Y = p => GY1 - Math.min(p, PM * 1.05) / PM * (GY1 - GY0);
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let p = 0; p <= PM + 1e-9; p += 0.5) { g.beginPath(); g.moveTo(GX0, Y(p)); g.lineTo(GX1, Y(p)); g.stroke(); g.fillText(p, GX0 - 5, Y(p) + 4); }
+  g.textAlign = "center"; for (let t = 0; t <= 100; t += 20) { g.beginPath(); g.moveTo(X(t), GY0); g.lineTo(X(t), GY1); g.stroke(); g.fillText(t, X(t), GY1 + 15); }
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, GY0); g.lineTo(GX0, GY1); g.lineTo(GX1, GY1); g.stroke();
+  g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText("Temperature (°C)", (GX0 + GX1) / 2, GY1 + 34);
+  g.save(); g.translate(14, (GY0 + GY1) / 2); g.rotate(-Math.PI / 2); g.fillText("Vapor pressure (atm)", 0, 0); g.restore();
+  g.strokeStyle = "#dc2626"; g.setLineDash([6, 4]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, Y(1)); g.lineTo(GX1, Y(1)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = "#b91c1c"; g.font = "11px Arial"; g.textAlign = "left"; g.fillText("1 atm", GX0 + 4, Y(1) - 4);
+  g.save(); g.beginPath(); g.rect(GX0, GY0, GX1 - GX0, GY1 - GY0); g.clip();
+  for (const k in LIQ) {
+    g.strokeStyle = LIQ[k].col; g.lineWidth = k === S.liq ? 3.5 : 2; g.globalAlpha = k === S.liq ? 1 : 0.55; g.beginPath();
+    for (let t = 0; t <= 100; t += 1) { const y = Y(VP(k, t)); t ? g.lineTo(X(t), y) : g.moveTo(X(t), y); } g.stroke(); g.globalAlpha = 1;
+    const tb = LIQ[k].Tb - 273.15; g.beginPath(); g.arc(X(tb), Y(1), 4.5, 0, 6.283); g.fillStyle = LIQ[k].col; g.fill();
+    g.fillStyle = "#1f2937"; g.font = "bold 11px Arial"; g.textAlign = "center"; g.fillText(`${tb.toFixed(0)} °C`, X(tb), Y(1) + 16);
+  }
+  g.restore();
+  const P = Pnow(); g.beginPath(); g.arc(X(S.T), Y(P), 6.5, 0, 6.283); g.strokeStyle = "#dc2626"; g.lineWidth = 2.5; g.stroke();
+}
+function drawPTime() {
+  const g = pg; g.clearRect(0, 0, 520, 120);
+  const ymax = Math.max(0.05, VP(S.liq, S.T) * 1.3, ...S.hist) , X = i => GX0 + i / 119 * (GX1 - GX0), Y = p => 100 - p / ymax * 88;
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, 10); g.lineTo(GX0, 100); g.lineTo(GX1, 100); g.stroke();
+  g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right"; g.fillText(ymax.toPrecision(2), GX0 - 4, 16); g.fillText("0", GX0 - 4, 104);
+  g.textAlign = "center"; g.fillText("pressure in the container over the last 30 s", (GX0 + GX1) / 2, 116);
+  g.strokeStyle = "#1d4ed8"; g.lineWidth = 2; g.beginPath(); S.hist.forEach((p, i) => i ? g.lineTo(X(i), Y(p)) : g.moveTo(X(i), Y(p))); g.stroke();
+}
+function rateBars() {
+  const m = Math.max(S.re, S.rc, 1e-9);
+  $("re").style.width = (100 * S.re / m) + "%"; $("rc").style.width = (100 * S.rc / m) + "%";
+  $("rev").textContent = ""; $("rcv").textContent = "";
+}
+function vaporWhy(kind) {
+  const L = LIQ[S.liq], vp = VP(S.liq, S.T);
+  const T = {
+    start: "The container started with no vapor. Molecules at the surface with enough kinetic energy <b>escape</b> into the vapor (evaporation); vapor molecules that hit the surface are <b>captured</b> (condensation). When the two rates are equal the pressure stops changing: that is the <b>vapor pressure</b>, a dynamic equilibrium.",
+    hotter: "Higher temperature: a larger fraction of molecules has enough kinetic energy to overcome the attractions and escape, so the evaporation rate goes up and the vapor pressure rises, <b>much faster than in proportion to T</b>.",
+    colder: "Lower temperature: fewer molecules have enough energy to escape, so evaporation slows, vapor condenses, and the vapor pressure falls.",
+    liq: `${L.f[0].toUpperCase() + L.f.slice(1)} has ${L.imf}. ${S.liq === "ether" ? "Weak attractions are easy to overcome, so many molecules escape: <b>high vapor pressure</b> and a low boiling point." : S.liq === "water" ? "Strong attractions hold the molecules in the liquid, so few escape: <b>low vapor pressure</b> and a high boiling point." : "In between: its vapor pressure is lower than ether's but higher than water's."}`,
+    vol: "Bigger container: the vapor is spread out, so for a moment the pressure drops and condensation slows. Evaporation (which depends only on the surface and the temperature) refills it, and the pressure returns to <b>the same vapor pressure</b>. Vapor pressure does not depend on the volume or on how much liquid there is.",
+    empty: "All the vapor was removed. Evaporation is now faster than condensation, so the pressure climbs back to the same vapor pressure.",
+    boil: `The vapor pressure (${vp.toFixed(2)} atm) is now more than 1 atm. In an <b>open</b> container at 1 atm the liquid would be <b>boiling</b>: bubbles of vapor can form inside the liquid when its vapor pressure equals the outside pressure. In this closed container the vapor simply builds up a higher pressure.`
+  };
+  $("why").innerHTML = T[kind];
+}
+
+// ---------------------------------------------------------------- heating curve (1 mol of water)
+const HC = [   // segments: [phase, kJ needed, T start, T end]
+  {ph: "ice warming", q: 18 * 2.09 * 30 / 1000, t0: -30, t1: 0, calc: "q = mcΔT = (18.0 g)(2.09 J/g·°C)(30 °C) = 1.13 kJ"},
+  {ph: "melting", q: 6.01, t0: 0, t1: 0, calc: "q = nΔH<sub>fus</sub> = (1.00 mol)(6.01 kJ/mol) = 6.01 kJ"},
+  {ph: "liquid warming", q: 18 * 4.18 * 100 / 1000, t0: 0, t1: 100, calc: "q = mcΔT = (18.0 g)(4.18 J/g·°C)(100 °C) = 7.52 kJ"},
+  {ph: "boiling", q: 40.7, t0: 100, t1: 100, calc: "q = nΔH<sub>vap</sub> = (1.00 mol)(40.7 kJ/mol) = 40.7 kJ"},
+  {ph: "steam warming", q: 18 * 2.01 * 30 / 1000, t0: 100, t1: 130, calc: "q = mcΔT = (18.0 g)(2.01 J/g·°C)(30 °C) = 1.09 kJ"}
+];
+const QTOT = HC.reduce((t, s) => t + s.q, 0);
+function hState(q) {
+  let acc = 0;
+  for (let i = 0; i < HC.length; i++) { const s = HC[i]; if (q <= acc + s.q + 1e-9 || i === HC.length - 1) { const f = Math.max(0, Math.min(1, (q - acc) / s.q)); return {i, f, T: s.t0 + (s.t1 - s.t0) * f, melt: i < 1 ? 0 : i === 1 ? f : 1, vap: i < 3 ? 0 : i === 3 ? f : 1}; } acc += s.q; }
+}
+const NH = 42;
+function makeH() {
+  S.hparts = [];
+  const cols = 7, rows = 6, x0 = 180 - (cols - 1) * 13, y0 = LBOT - 12 - (rows - 1) * 22;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) S.hparts.push({sx: x0 + c * 26 + (r % 2) * 6, sy: y0 + r * 22, x: 0, y: 0, vx: rnd(-1, 1), vy: rnd(-1, 1), st: "s", ord: Math.random()});
+  S.hparts.sort((a, b) => a.sy - b.sy);   // top layers melt and evaporate first
+  S.hparts.forEach((p, i) => { p.rank = i; p.x = p.sx; p.y = p.sy; });
+}
+function stepHeating(dt) {
+  if (S.dir) { S.q = Math.max(0, Math.min(QTOT, S.q + S.dir * 2.2 * dt)); if (S.q === 0 || S.q === QTOT) { S.dir = 0; heatButtons(); } }
+  const st = hState(S.q), nl = Math.round(NH * st.melt), ng = Math.round(NH * st.vap);
+  const Tk = st.T + 273.15, v = 22 * Math.sqrt(Tk / 273);
+  S.hparts.forEach((p, i) => {
+    const want = i < ng ? "g" : i < nl ? "l" : "s";
+    if (want !== p.st) { p.st = want; p.fl = 1; const a = rnd(0, 6.283); p.vx = v * Math.cos(a); p.vy = v * Math.sin(a) - (want === "g" ? 30 : 0); }
+    if (p.fl) p.fl = Math.max(0, p.fl - dt * 1.5);
+    if (p.st === "s") { const amp = 0.8 + 2.5 * (st.T + 30) / 30; p.x = p.sx + rnd(-amp, amp) * 0.5; p.y = p.sy + rnd(-amp, amp) * 0.5; }
+    else {
+      const sp = Math.hypot(p.vx, p.vy) || 1, target = p.st === "g" ? v * 3 : v; p.vx *= target / sp; p.vy *= target / sp;
+      p.vx += rnd(-1, 1) * (p.st === "l" ? 120 : 10) * dt; p.vy += rnd(-1, 1) * (p.st === "l" ? 120 : 10) * dt + (p.st === "l" ? 40 * dt : 0);
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      const top = p.st === "g" ? 30 : LBOT - 150;
+      if (p.x < CX0 + 7) { p.x = CX0 + 7; p.vx = Math.abs(p.vx); } if (p.x > CX1 - 7) { p.x = CX1 - 7; p.vx = -Math.abs(p.vx); }
+      if (p.y < top) { p.y = top; p.vy = Math.abs(p.vy); } if (p.y > LBOT - 7) { p.y = LBOT - 7; p.vy = -Math.abs(p.vy); }
+    }
+  });
+  // liquid molecules stay close together: gently pull each toward the liquid's centre
+  const ls = S.hparts.filter(p => p.st === "l");
+  if (ls.length) {
+    const solidTop = Math.min(...S.hparts.filter(p => p.st === "s").map(p => p.sy), LBOT);
+    const depth = Math.max(30, ls.length * 4.2), yTarget = Math.min(solidTop, LBOT) - depth / 2;
+    for (const p of ls) { p.vy += (yTarget - p.y) * 3 * dt; if (p.y < yTarget - depth / 2 - 6) p.y = yTarget - depth / 2 - 6; if (p.y > LBOT - 7) p.y = LBOT - 7; }
+  }
+}
+function drawHeating() {
+  const g = bg, st = hState(S.q); g.clearRect(0, 0, W, H);
+  g.fillStyle = "#f8fafc"; g.fillRect(CX0, 20, CX1 - CX0, LBOT - 20);
+  g.strokeStyle = "#475569"; g.lineWidth = 4; g.strokeRect(CX0 - 2, 18, CX1 - CX0 + 4, LBOT - 16);
+  // heater
+  g.fillStyle = S.dir > 0 ? "#ef4444" : S.dir < 0 ? "#38bdf8" : "#94a3b8"; g.fillRect(CX0 + 20, LBOT + 6, CX1 - CX0 - 40, 8);
+  for (const p of S.hparts) {
+    if (p.fl) { g.beginPath(); g.arc(p.x, p.y, 13, 0, 6.283); g.fillStyle = `rgba(250,204,21,${0.45 * p.fl})`; g.fill(); }
+    // water molecule: O with two H
+    g.beginPath(); g.arc(p.x, p.y, 7, 0, 6.283); g.fillStyle = "#dc2626"; g.fill();
+    g.fillStyle = "#f1f5f9"; g.strokeStyle = "#94a3b8"; g.lineWidth = 1;
+    for (const a of [-0.6, 0.6]) { const ang = Math.PI / 2 + a + (p.st === "s" ? 0 : p.ord * 6); g.beginPath(); g.arc(p.x + Math.cos(ang) * 7, p.y + Math.sin(ang) * 7, 3.5, 0, 6.283); g.fill(); g.stroke(); }
+  }
+  // thermometer + readout
+  const tx = 420, T = st.T; g.fillStyle = "#fff"; g.strokeStyle = "#475569"; g.lineWidth = 2; g.fillRect(tx - 7, 40, 14, 220); g.strokeRect(tx - 7, 40, 14, 220);
+  const ty = 250 - (T + 30) / 160 * 200; g.fillStyle = "#dc2626"; g.fillRect(tx - 4, ty, 8, 262 - ty); g.beginPath(); g.arc(tx, 268, 12, 0, 6.283); g.fill();
+  g.font = "10px Arial"; g.fillStyle = "#6b7280"; g.textAlign = "left";
+  for (const t of [-20, 0, 50, 100, 130]) { const y = 250 - (t + 30) / 160 * 200; g.fillRect(tx + 7, y, 5, 1.2); g.fillText(t + "°", tx + 14, y + 3); }
+  g.font = "bold 18px Arial"; g.fillStyle = "#1f2937"; g.textAlign = "center"; g.fillText(`${T.toFixed(1)} °C`, tx, 310);
+  g.font = "13px Arial"; g.fillText(HC[st.i].ph, tx, 330);
+}
+function drawHGraph() {
+  const g = hgg; g.clearRect(0, 0, 520, 300);
+  const X = q => GX0 + q / 60 * (GX1 - GX0), Y = t => 260 - (t + 40) / 180 * 248;
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let t = -40; t <= 140; t += 20) { g.beginPath(); g.moveTo(GX0, Y(t)); g.lineTo(GX1, Y(t)); g.stroke(); g.fillText(t, GX0 - 5, Y(t) + 4); }
+  g.textAlign = "center"; for (let q = 0; q <= 60; q += 10) { g.beginPath(); g.moveTo(X(q), 12); g.lineTo(X(q), 260); g.stroke(); g.fillText(q, X(q), 275); }
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, 12); g.lineTo(GX0, 260); g.lineTo(GX1, 260); g.stroke();
+  g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText("Heat added (kJ)", (GX0 + GX1) / 2, 294);
+  g.save(); g.translate(14, 136); g.rotate(-Math.PI / 2); g.fillText("Temperature (°C)", 0, 0); g.restore();
+  // whole curve faint, the part done so far bold
+  const path = qmax => { g.beginPath(); let acc = 0; g.moveTo(X(0), Y(-30)); for (const s of HC) { const q1 = Math.min(acc + s.q, qmax); if (q1 <= acc) break; const f = (q1 - acc) / s.q; g.lineTo(X(q1), Y(s.t0 + (s.t1 - s.t0) * f)); acc += s.q; } g.stroke(); };
+  g.strokeStyle = "#cbd5e1"; g.lineWidth = 2; g.setLineDash([5, 4]); path(QTOT); g.setLineDash([]);
+  g.strokeStyle = "#1d4ed8"; g.lineWidth = 3; path(S.q);
+  const st = hState(S.q); g.beginPath(); g.arc(X(S.q), Y(st.T), 6, 0, 6.283); g.fillStyle = "#dc2626"; g.fill();
+  // segment labels
+  let acc = 0; g.font = "11px Arial"; g.fillStyle = "#475569";
+  const lbl = ["ice", "melting", "water", "boiling", "steam"];
+  HC.forEach((s, i) => { const xm = X(acc + s.q / 2), tm = (s.t0 + s.t1) / 2; g.textAlign = "center"; g.fillText(lbl[i], i === 0 ? xm + 8 : i === 4 ? xm - 4 : xm, Y(tm) - (s.t0 === s.t1 ? 8 : 0) - (i === 0 || i === 2 || i === 4 ? 10 : 0)); acc += s.q; });
+}
+function heatingPanel() {
+  const st = hState(S.q), s = HC[st.i];
+  const keFrac = (st.T + 273.15) / 403.15, peFrac = st.melt * 6.01 + st.vap * 40.7;
+  $("hke").style.width = (100 * keFrac) + "%"; $("hkev").textContent = `${(st.T + 273.15).toFixed(0)} K`;
+  $("hpe").style.width = (100 * Math.max(0, peFrac) / 46.7) + "%"; $("hpev").textContent = `${Math.max(0, peFrac).toFixed(1)} kJ`;
+  $("hcalc").innerHTML = `Heat added so far: <b>${S.q.toFixed(2)} kJ</b> of ${QTOT.toFixed(1)} kJ<br>This stage (${s.ph}): ${s.calc}`;
+  const W = {
+    0: "The ice is warming up. The heat raises the <b>kinetic energy</b> of the molecules: they vibrate faster in their fixed positions, so the temperature rises.",
+    1: "Melting: the temperature <b>stays at 0 °C</b>. The heat is used to break some of the hydrogen bonds that hold the molecules in the crystal (potential energy), not to make them move faster.",
+    2: "Liquid water warming up: the heat raises the kinetic energy again, so the temperature rises. Water has a high specific heat (4.18 J/g·°C), so this takes more heat per degree than warming ice or steam.",
+    3: "Boiling: the temperature <b>stays at 100 °C</b> while the molecules separate completely. Vaporization needs much more energy than melting (40.7 vs 6.01 kJ/mol), because <b>all</b> the attractions between the molecules must be overcome, not just some.",
+    4: "Steam warming up: the gas molecules move faster and the temperature rises."
+  };
+  let w = W[st.i];
+  if (S.dir < 0) w = "<b>Cooling</b> runs the same steps in reverse: the temperature stays constant while the steam condenses (100 °C) and while the water freezes (0 °C), because forming attractions <b>releases</b> energy.";
+  $("why").innerHTML = w;
+}
+function heatButtons() { $("b-heat").classList.toggle("primary", S.dir > 0); $("b-cool").classList.toggle("primary", S.dir < 0); }
+
+// ---------------------------------------------------------------- controls
+$("liq").innerHTML = Object.keys(LIQ).map(k => `<option value="${k}">${LIQ[k].f}</option>`).join("");
+function showT() { $("tempv").textContent = `${S.T} °C (${(S.T + 273.15).toFixed(0)} K)`; }
+let wasBoil = false;
+$("temp").addEventListener("input", e => {
+  const v = +e.target.value, up = v > S.T; S.T = v; showT();
+  const b = VP(S.liq, S.T) > 1; if (b && !wasBoil) vaporWhy("boil"); else vaporWhy(up ? "hotter" : "colder"); wasBoil = b;
+});
+$("liq").onchange = () => { S.liq = $("liq").value; S.nv = 0; S.vap = []; S.hist = []; vaporWhy("liq"); legend(); wasBoil = VP(S.liq, S.T) > 1; };
+$("b-vol").onclick = () => { S.V = S.V === 1 ? 2 : 1; $("b-vol").textContent = S.V === 1 ? "⇕ Double the volume" : "⇕ Halve the volume"; vaporWhy("vol"); };
+$("b-empty").onclick = () => { S.nv = 0; S.vap = []; vaporWhy("empty"); };
+$("b-heat").onclick = () => { S.dir = S.q >= QTOT ? 0 : 1; heatButtons(); };
+$("b-cool").onclick = () => { S.dir = S.q <= 0 ? 0 : -1; heatButtons(); };
+$("b-stop").onclick = () => { S.dir = 0; heatButtons(); };
+$("b-hreset").onclick = () => { S.dir = 0; S.q = 0; makeH(); heatButtons(); };
+function legend() {
+  if (S.mode === "vapor") {
+    $("legend").innerHTML = `<span><span class="dot" style="background:${LIQ[S.liq].col}"></span>${LIQ[S.liq].f} molecule</span><span><span class="dot" style="background:#fff;border:2px solid #f97316"></span>evaporating</span><span><span class="dot" style="background:#fff;border:2px solid #0ea5e9"></span>condensing</span>`;
+    $("glegend").innerHTML = Object.keys(LIQ).map(k => `<span><span class="dot" style="background:${LIQ[k].col}"></span>${LIQ[k].f}</span>`).join("") + `<span><span class="dot" style="background:#fff;border:2px solid #dc2626"></span>the container now</span><span>dots on the 1 atm line: normal boiling points</span>`;
+  } else $("legend").innerHTML = `<span><span class="dot" style="background:#dc2626"></span>H₂O molecule (O red, H white)</span>`;
+}
+function setMode(m) {
+  S.mode = m;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  for (const e of document.querySelectorAll(".va")) e.style.display = m === "vapor" ? "" : "none";
+  for (const e of document.querySelectorAll(".he")) e.style.display = m === "heating" ? "" : "none";
+  $("foot").innerHTML = m === "vapor"
+    ? "Vapor pressures are calculated with the Clausius–Clapeyron equation from each liquid's normal boiling point and ΔH<sub>vap</sub> (26.5, 38.6 and 40.7 kJ/mol), so they are close to, but not exactly, the measured values. The container is closed and started with no vapor (no air)."
+    : "Specific heats: ice 2.09, water 4.18, steam 2.01 J/g·°C. ΔH<sub>fus</sub> = 6.01 kJ/mol, ΔH<sub>vap</sub> = 40.7 kJ/mol. The heater adds energy at a constant rate.";
+  if (m === "vapor") { S.nv = 0; S.vap = []; S.hist = []; makeLiquid(); vaporWhy("start"); }
+  else { S.q = 0; S.dir = 0; makeH(); heatButtons(); }
+  legend();
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+
+// ---------------------------------------------------------------- first-visit tours
+const TOURS = {
+  vapor: [
+    ["#box", "A closed container with a liquid at the bottom. Molecules escape from the surface (orange rings) and vapor molecules are captured by it (blue rings). The gauge shows the pressure of the vapor."],
+    ["#ctl", "Change the liquid or the temperature. You can also double the volume or pump out the vapor and see what the pressure does."],
+    ["#graphcard", "The vapor pressure curves of all three liquids. Where each one crosses 1 atm is its normal boiling point. The bars compare the evaporation and condensation rates."]
+  ],
+  heating: [
+    ["#box", "1 mol of ice, heated at a constant rate. Watch the molecules leave the crystal and then the liquid."],
+    ["#ctl", "Heat or cool, pause any time, or start over."],
+    ["#graphcard", "The heating curve builds up as heat is added. The bars show where the energy goes: into kinetic energy (temperature) or into overcoming attractions (phase changes)."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-vp-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {vapor: "Vapor pressure", heating: "Heating curve"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
+// ---------------------------------------------------------------- run
+let last = performance.now(), pT = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.mode === "vapor") { stepVapor(dt); drawVapor(); drawVPGraph(); drawPTime(); if ((pT -= dt) <= 0) { pT = 0.2; rateBars(); } }
+  else { stepHeating(dt); drawHeating(); drawHGraph(); if ((pT -= dt) <= 0) { pT = 0.2; heatingPanel(); } }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const l = q.get("liquid"); if (l && LIQ[l]) S.liq = l;
+  $("liq").value = S.liq; showT();
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "heating" ? "heating" : "vapor");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>

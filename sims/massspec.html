@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mass Spectrometry</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+select, input[type=text] { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+input[type=text] { width: 7em; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+table.stats { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+table.stats td, table.stats th { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+table.stats th { font-size: 12px; color: var(--muted); font-weight: normal; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 15px; line-height: 1.6; margin-top: 8px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.ok { color: #047857; } .bad { color: #b91c1c; }
+.mode { display: none; } .mode.active { display: block; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Mass Spectrometry of Elements</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="explore">Explore</button>
+  <button data-mode="identify">Identify the element</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 460px" id="boxcard">
+    <section class="mode" id="m-explore">
+      <canvas id="box" width="520" height="330" aria-label="Mass spectrometer: ions are bent by a magnet onto a detector"></canvas>
+      <div class="ctl" id="ctl">
+        <b>Sample</b>
+        <div><select id="el"></select></div>
+        <b></b>
+        <div><button id="b-run" class="primary">▶ Run the spectrometer</button><button id="b-full">⏭ Full spectrum</button></div>
+      </div>
+    </section>
+    <section class="mode" id="m-identify">
+      <h2>Mystery sample</h2>
+      <p style="margin:4px 0 8px;line-height:1.5">The mass spectrum of a pure element is shown. Calculate its <b>average atomic mass</b> and identify it.</p>
+      <div class="ctl" id="answer">
+        <b>Average atomic mass</b>
+        <div><input type="text" id="q-m" inputmode="decimal" placeholder="e.g. 24.31"> amu</div>
+        <b>Element</b>
+        <div><select id="q-el"></select></div>
+        <b></b>
+        <div><button id="b-check" class="primary">Check</button><button id="b-new">New sample</button></div>
+      </div>
+      <div class="why" id="feedback" style="display:none"></div>
+      <div class="note">Use the mass of each isotope ≈ its m/z value, or the exact masses in the table if you have them. Answers within 0.05 amu count.</div>
+    </section>
+  </div>
+
+  <div class="card" style="flex:1 1 500px" id="graphcard">
+    <h2 id="gtitle">Mass spectrum</h2>
+    <canvas id="graph" width="520" height="280" aria-label="Mass spectrum: relative abundance against mass-to-charge ratio"></canvas>
+    <table class="stats" id="table"></table>
+    <div class="big" id="calc"></div>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note" id="foot">Masses in atomic mass units (amu); abundances are natural abundances. The spectrometer drawing is not to scale: in a real instrument the paths of neighbouring isotopes differ by only a few percent.</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const EL = {
+  B: {name: "boron", iso: [[10, 10.0129, 19.9], [11, 11.0093, 80.1]]},
+  Ne: {name: "neon", iso: [[20, 19.9924, 90.48], [21, 20.9938, 0.27], [22, 21.9914, 9.25]]},
+  Mg: {name: "magnesium", iso: [[24, 23.9850, 78.99], [25, 24.9858, 10.00], [26, 25.9826, 11.01]]},
+  Si: {name: "silicon", iso: [[28, 27.9769, 92.23], [29, 28.9765, 4.68], [30, 29.9738, 3.09]]},
+  Cl: {name: "chlorine (atoms)", iso: [[35, 34.9689, 75.76], [37, 36.9659, 24.24]]},
+  Cu: {name: "copper", iso: [[63, 62.9296, 69.15], [65, 64.9278, 30.85]]},
+  Ga: {name: "gallium", iso: [[69, 68.9256, 60.11], [71, 70.9247, 39.89]]},
+  Br: {name: "bromine (atoms)", iso: [[79, 78.9183, 50.69], [81, 80.9163, 49.31]]},
+  Rb: {name: "rubidium", iso: [[85, 84.9118, 72.17], [87, 86.9092, 27.83]]},
+  Zr: {name: "zirconium", iso: [[90, 89.9047, 51.45], [91, 90.9056, 11.22], [92, 91.9050, 17.15], [94, 93.9063, 17.38], [96, 95.9083, 2.80]]},
+  Ag: {name: "silver", iso: [[107, 106.9051, 51.84], [109, 108.9048, 48.16]]}
+};
+// Cl2 molecules: every combination of two Cl atoms
+(function () {
+  const [a, b] = EL.Cl.iso, pa = a[2] / 100, pb = b[2] / 100;
+  EL.Cl2 = {name: "Cl₂ molecules", mol: true, iso: [[70, 2 * a[1], 100 * pa * pa, "³⁵Cl–³⁵Cl"], [72, a[1] + b[1], 100 * 2 * pa * pb, "³⁵Cl–³⁷Cl"], [74, 2 * b[1], 100 * pb * pb, "³⁷Cl–³⁷Cl"]]};
+})();
+const COLS = ["#1d4ed8", "#dc2626", "#059669", "#d97706", "#7c3aed"];
+const avg = k => EL[k].iso.reduce((t, i) => t + i[1] * i[2] / 100, 0);
+const S = {mode: "explore", el: "Mg", counts: {}, total: 0, running: false, full: false, ions: [], hidden: null};
+const TARGET = 400;
+
+// ---------------------------------------------------------------- spectrometer
+const W = 520, H = 330, SY = 70, MX = 210;      // ion beam height, magnet entry x
+function radius(k, m) { const is = EL[k].iso, lo = is[0][0], hi = is[is.length - 1][0]; return hi === lo ? 85 : 55 + (m - lo) / (hi - lo) * 60; }
+function pick(k) { let r = Math.random() * 100; for (let i = 0; i < EL[k].iso.length; i++) { r -= EL[k].iso[i][2]; if (r <= 0) return i; } return EL[k].iso.length - 1; }
+function spawn() { const i = pick(S.el), m = EL[S.el].iso[i][0]; S.ions.push({i, m, s: 0, r: radius(S.el, m), v: 260 * Math.sqrt(EL[S.el].iso[0][0] / m)}); }
+function ionPos(p) {
+  // straight from the source to the magnet, then half a circle, then on to the detector
+  const L1 = MX - 60;
+  if (p.s < L1) return [60 + p.s, SY];
+  const a = (p.s - L1) / p.r;
+  if (a < Math.PI) return [MX + p.r * Math.sin(a), SY + p.r - p.r * Math.cos(a)];
+  return [MX - (p.s - L1 - Math.PI * p.r), SY + 2 * p.r];
+}
+function step(dt) {
+  if (S.running) { S.acc = (S.acc || 0) + dt * 14; while (S.acc >= 1) { S.acc--; spawn(); } }
+  for (const p of S.ions) {
+    p.s += p.v * dt;
+    const [x] = ionPos(p), L1 = MX - 60;
+    if (p.s > L1 + Math.PI * p.r && x <= 130) { p.done = true; S.counts[p.m] = (S.counts[p.m] || 0) + 1; S.total++; S.hit = S.hit || {}; S.hit[p.m] = 1; }
+  }
+  S.ions = S.ions.filter(p => !p.done);
+  if (S.hit) for (const m in S.hit) { S.hit[m] -= dt * 3; if (S.hit[m] <= 0) delete S.hit[m]; }
+  if (S.running && S.total >= TARGET) { S.running = false; S.full = true; $("b-run").textContent = "▶ Run again"; explain("done"); }
+}
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, W, H); hiDPI(graph, 520, 280);
+function drawBox() {
+  const g = bg, k = S.el, is = EL[k].iso; g.clearRect(0, 0, W, H);
+  // magnet
+  g.fillStyle = "rgba(148,163,184,.18)"; g.beginPath(); g.moveTo(MX, SY - 25); g.lineTo(MX, 320); g.arc(MX, 192, 128, Math.PI / 2, -Math.PI / 2, true); g.closePath(); g.fill();
+  g.fillStyle = "#64748b"; g.font = "bold 12px Arial"; g.textAlign = "center"; g.fillText("magnetic field", MX + 95, 200);
+  // source, ionizer, accelerator
+  g.fillStyle = "#e2e8f0"; g.fillRect(8, SY - 22, 40, 44); g.strokeStyle = "#475569"; g.lineWidth = 2; g.strokeRect(8, SY - 22, 40, 44);
+  g.fillStyle = "#334155"; g.font = "11px Arial"; g.fillText("sample", 28, SY - 28); g.fillText(EL[k].mol ? "Cl₂" : k, 28, SY + 4);
+  g.fillStyle = "#facc15"; g.fillRect(62, SY - 20, 10, 40); g.fillStyle = "#334155"; g.fillText("ionize", 67, SY + 34);
+  for (const x of [110, 130]) { g.fillStyle = "#94a3b8"; g.fillRect(x, SY - 20, 5, 15); g.fillRect(x, SY + 5, 5, 15); }
+  g.fillText("accelerate", 122, SY + 34);
+  // detector
+  g.fillStyle = "#334155"; g.fillRect(118, SY + 2 * 50, 8, 2 * 70); g.font = "11px Arial"; g.textAlign = "right"; g.fillText("detector", 112, SY + 2 * 50 - 6);
+  is.forEach((iso, i) => {
+    const y = SY + 2 * radius(k, iso[0]);
+    g.fillStyle = S.hit && S.hit[iso[0]] ? `rgba(250,204,21,${S.hit[iso[0]]})` : "transparent"; g.fillRect(112, y - 6, 20, 12);
+    g.fillStyle = COLS[i % 5]; g.font = "bold 12px Arial"; g.textAlign = "right"; g.fillText(`m/z ${iso[0]}`, 108, y + 4);
+  });
+  // ions
+  for (const p of S.ions) { const [x, y] = ionPos(p); g.beginPath(); g.arc(x, y, 4.5, 0, 6.283); g.fillStyle = COLS[p.i % 5]; g.fill(); g.fillStyle = "#fff"; g.font = "bold 8px Arial"; g.textAlign = "center"; g.fillText("+", x, y + 3); }
+  g.fillStyle = "#1f2937"; g.font = "13px Arial"; g.textAlign = "left"; g.fillText(`ions detected: ${S.total}`, 360, 24);
+}
+// ---------------------------------------------------------------- spectrum
+function spectrum(k, frac) {
+  // frac: measured fractions (explore) or exact abundances
+  const is = EL[k].iso, lo = is[0][0] - 2, hi = is[is.length - 1][0] + 2, g = gg;
+  g.clearRect(0, 0, 520, 280);
+  const X0 = 52, X1 = 505, Y0 = 14, Y1 = 236, X = m => X0 + (m - lo) / (hi - lo) * (X1 - X0), Y = p => Y1 - p / 100 * (Y1 - Y0);
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let p = 0; p <= 100; p += 20) { g.beginPath(); g.moveTo(X0, Y(p)); g.lineTo(X1, Y(p)); g.stroke(); g.fillText(p, X0 - 5, Y(p) + 4); }
+  g.textAlign = "center"; const st = hi - lo > 14 ? 2 : 1;
+  for (let m = lo; m <= hi; m += st) g.fillText(m, X(m), Y1 + 15);
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X0, Y0); g.lineTo(X0, Y1); g.lineTo(X1, Y1); g.stroke();
+  g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText("Mass-to-charge ratio (m/z)", (X0 + X1) / 2, Y1 + 36);
+  g.save(); g.translate(14, (Y0 + Y1) / 2); g.rotate(-Math.PI / 2); g.fillText("Relative abundance (%)", 0, 0); g.restore();
+  is.forEach((iso, i) => {
+    const p = frac[i]; if (p <= 0) return;
+    g.fillStyle = COLS[i % 5]; g.fillRect(X(iso[0]) - 5, Y(p), 10, Y1 - Y(p));
+    g.fillStyle = "#1f2937"; g.font = "bold 12px Arial"; g.fillText(p.toFixed(p < 1 ? 2 : 1) + "%", X(iso[0]), Y(p) - 6);
+  });
+}
+function table(k, show) {
+  const is = EL[k].iso;
+  $("table").innerHTML = `<tr><th>${EL[k].mol ? "Molecule" : "Isotope"}</th><th>m/z</th><th>Exact mass (amu)</th><th>Abundance</th></tr>` +
+    is.map((iso, i) => `<tr><td><b style="color:${COLS[i % 5]}">${EL[k].mol ? iso[3] : `${k}-${iso[0]}`}</b></td><td>${iso[0]}</td><td>${show ? iso[1].toFixed(4) : "?"}</td><td>${iso[2].toFixed(2)}%</td></tr>`).join("");
+}
+function calc(k) {
+  const is = EL[k].iso, a = avg(k);
+  if (EL[k].mol) { $("calc").innerHTML = `Average molar mass of Cl₂ = ${is.map(i => `(${i[1].toFixed(2)})(${(i[2] / 100).toFixed(4)})`).join(" + ")} = <b>${a.toFixed(2)} amu</b> = 2 × 35.45`; return; }
+  $("calc").innerHTML = `Average atomic mass = ${is.map(i => `(${i[1].toFixed(2)})(${(i[2] / 100).toFixed(4)})`).join(" + ")} = <b>${a.toFixed(2)} amu</b>`;
+}
+function explain(kind) {
+  const k = S.el, is = EL[k].iso, a = avg(k), top = is.reduce((b, i) => i[2] > b[2] ? i : b);
+  const T = {
+    start: "A mass spectrometer turns atoms into positive ions, speeds them up, and bends their path with a magnet. <b>Heavier ions bend less</b>, so each isotope lands at a different place on the detector. The detector counts how many ions of each mass arrive. Press <b>Run</b>.",
+    done: EL[k].mol
+      ? "Cl₂ gives <b>three</b> peaks, not two: each molecule contains two Cl atoms, and each can be ³⁵Cl or ³⁷Cl. ³⁵Cl–³⁵Cl is most common (0.7576² = 57%); a mixed molecule can form two ways (2 × 0.7576 × 0.2424 = 37%); ³⁷Cl–³⁷Cl is rare (6%)."
+      : `Each peak is one <b>isotope</b> of ${EL[k].name}: atoms with the same number of protons but different numbers of neutrons. The height of a peak is its abundance. The average atomic mass (${a.toFixed(2)} amu) is a weighted average, so it is closest to the most abundant isotope (${k}-${top[0]})${is.length === 2 && Math.abs(is[0][2] - is[1][2]) < 5 ? ", and almost halfway between the two because they are nearly equally common" : ""}. It is the mass on the periodic table.`
+  };
+  $("why").innerHTML = T[kind];
+}
+function drawExplore() {
+  const k = S.el, is = EL[k].iso;
+  const frac = S.full ? is.map(i => i[2]) : is.map(i => S.total ? 100 * (S.counts[i[0]] || 0) / S.total : 0);
+  spectrum(k, frac);
+}
+function reset() { S.counts = {}; S.total = 0; S.ions = []; S.full = false; S.running = false; $("b-run").textContent = "▶ Run the spectrometer"; table(S.el, true); $("calc").innerHTML = ""; explain("start"); }
+$("el").innerHTML = Object.keys(EL).map(k => `<option value="${k}">${EL[k].mol ? "Cl₂ (chlorine molecules)" : `${k}: ${EL[k].name}`}</option>`).join("");
+$("el").onchange = () => { S.el = $("el").value; reset(); };
+$("b-run").onclick = () => { if (S.full || S.total >= TARGET) reset(); S.running = !S.running; $("b-run").textContent = S.running ? "❚❚ Pause" : "▶ Run the spectrometer"; };
+$("b-full").onclick = () => { S.running = false; S.full = true; S.ions = []; $("b-run").textContent = "▶ Run again"; calc(S.el); explain("done"); };
+// ---------------------------------------------------------------- identify tab
+const IDS = Object.keys(EL).filter(k => !EL[k].mol);
+$("q-el").innerHTML = `<option value="">choose…</option>` + IDS.slice().sort((a, b) => avg(a) - avg(b)).map(k => `<option value="${k}">${k} (${EL[k].name.replace(" (atoms)", "")})</option>`).join("");
+function newHidden() { let k; do { k = IDS[Math.floor(Math.random() * IDS.length)]; } while (k === S.hidden && IDS.length > 1); S.hidden = k; }
+function showHidden() {
+  const k = S.hidden; spectrum(k, EL[k].iso.map(i => i[2]));
+  $("table").innerHTML = `<tr><th>Peak</th><th>m/z</th><th>Abundance</th></tr>` + EL[k].iso.map((i, n) => `<tr><td><b style="color:${COLS[n % 5]}">${n + 1}</b></td><td>${i[0]}</td><td>${i[2].toFixed(2)}%</td></tr>`).join("");
+  $("calc").innerHTML = ""; $("why").innerHTML = "Multiply each isotope's mass by its abundance (as a decimal) and add them up. Then find the element with that average atomic mass on the periodic table.";
+  $("feedback").style.display = "none"; $("q-m").value = ""; $("q-el").value = "";
+}
+$("b-new").onclick = () => { newHidden(); showHidden(); };
+$("b-check").onclick = () => {
+  const k = S.hidden, a = avg(k), am = EL[k].iso.reduce((t, i) => t + i[0] * i[2] / 100, 0), v = parseFloat($("q-m").value.replace(",", ".")), e = $("q-el").value, fb = $("feedback");
+  fb.style.display = "";
+  const okM = isFinite(v) && (Math.abs(v - a) <= 0.05 || Math.abs(v - am) <= 0.05), okE = e === k;
+  let s = `<div class="${okM ? "ok" : "bad"}">${okM ? "✓" : "✗"} Average mass: ${okM ? `correct (${a.toFixed(2)} amu).` : isFinite(v) ? `not quite. Use (mass × fraction) for every peak and add them: ${EL[k].iso.map(i => `(${i[0]})(${(i[2] / 100).toFixed(4)})`).join(" + ")}.` : "enter a number."}</div>`;
+  s += `<div class="${okE ? "ok" : "bad"}">${okE ? "✓" : "✗"} Element: ${okE ? `correct, ${EL[k].name.replace(" (atoms)", "")}.` : e ? `no: ${e} has an average atomic mass of ${avg(e).toFixed(2)} amu.` : "choose an element."}</div>`;
+  if (okM && okE) { s += `<div style="margin-top:6px">Press <b>New sample</b> for another one.</div>`; table(k, true); calc(k); }
+  fb.innerHTML = s;
+};
+// ---------------------------------------------------------------- tabs
+function setMode(m) {
+  S.mode = m;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  if (m === "explore") reset(); else { if (!S.hidden) newHidden(); showHidden(); }
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+// ---------------------------------------------------------------- first-visit tours
+const TOURS = {
+  explore: [
+    ["#box", "A simplified mass spectrometer. Atoms are turned into + ions and bent by a magnet. Heavier ions bend less, so each isotope lands in a different place on the detector."],
+    ["#ctl", "Choose a sample and run the spectrometer, or jump straight to the full spectrum."],
+    ["#graphcard", "The mass spectrum builds up as ions arrive: one peak per isotope. The calculation of the average atomic mass appears when the spectrum is complete."]
+  ],
+  identify: [
+    ["#graphcard", "The mass spectrum of a mystery element, with the abundance of each peak."],
+    ["#answer", "Calculate the average atomic mass, choose the element, and press <b>Check</b>."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-ms-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {explore: "Explore", identify: "Identify the element"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+// ---------------------------------------------------------------- run
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.mode === "explore") { step(dt); drawBox(); drawExplore(); if (S.full && !$("calc").innerHTML) calc(S.el); }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const e = q.get("el"); if (e && EL[e]) S.el = e;
+  $("el").value = S.el;
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "identify" ? "identify" : "explore");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>
