@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equilibrium Box</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; --no2: #b45309; --n2o4: #64748b; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.eq { font-size: 17px; margin: 0 0 12px; }
+.eq .a { color: var(--no2); font-weight: bold; } .eq .b { color: var(--n2o4); font-weight: bold; }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: manipulation; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.status { font-size: 15px; line-height: 1.45; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); margin-top: 10px; min-height: 48px; }
+.status.eqm { border-color: #86efac; background: #f0fdf4; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; }
+.why:empty { display: none; }
+.gauge { position: relative; height: 46px; margin: 8px 6px 2px; }
+.gauge .bar { position: absolute; left: 0; right: 0; top: 18px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #dbeafe, #f8fafc 50%, #fee2e2); border: 1px solid #cbd5e1; }
+.gauge .k { position: absolute; top: 8px; width: 3px; height: 30px; background: #111827; margin-left: -1px; left: 50%; }
+.gauge .q { position: absolute; top: 0; margin-left: -9px; width: 18px; text-align: center; font-size: 12px; font-weight: bold; color: var(--accent); }
+.gauge .q::after { content: ""; display: block; margin: 1px auto 0; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 10px solid var(--accent); }
+.gl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.rates { display: grid; grid-template-columns: 7.5em 1fr 5em; gap: 6px 8px; align-items: center; font-size: 13px; margin-top: 8px; }
+.rates .rb { height: 14px; border-radius: 4px; background: #e2e8f0; position: relative; overflow: hidden; }
+.rates .rb i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+.predict { border: 2px solid var(--accent); background: #eff6ff; border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+.predict p { margin: 0 0 8px; }
+.predict div { display: flex; flex-wrap: wrap; gap: 6px; }
+.fb-ok { color: #166534; } .fb-x { color: #b91c1c; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+</style>
+</head>
+<body>
+<h1 id="title">Equilibrium Box: Le Chatelier's Principle</h1>
+<div class="eq"><span class="a">2 NO₂(g)</span> (brown) &nbsp;⇌&nbsp; <span class="b">N₂O₄(g)</span> (colorless) &nbsp;&nbsp; ΔH° = −57 kJ/mol (forward is exothermic)</div>
+
+<div class="row">
+  <div class="card" style="flex:1 1 520px">
+    <canvas id="box" width="560" height="300" aria-label="Particles of NO2 and N2O4 in a container"></canvas>
+    <div class="legend"><span><span class="dot" style="background:#c2410c"></span>NO₂</span><span><span class="dot" style="background:#fff;border:2px solid #64748b"></span>N₂O₄ (two joined)</span><span id="lg-ar" hidden><span class="dot" style="background:#a3a3a3"></span>Ar</span><span id="counts"></span></div>
+    <div class="ctl">
+      <b>Add / remove</b>
+      <div><button data-a="addA">+20 NO₂</button><button data-a="remA">−20 NO₂</button><button data-a="addB">+10 N₂O₄</button><button data-a="remB">−10 N₂O₄</button></div>
+      <b>Temperature</b>
+      <div><button data-t="0">Ice bath 0 °C</button><button data-t="1">Room 25 °C</button><button data-t="2">Hot 100 °C</button></div>
+      <b>Volume</b>
+      <div><button data-a="small">Compress (½ V)</button><button data-a="big">Expand (2 V)</button></div>
+      <b>Other</b>
+      <div><button data-a="cat" id="b-cat">Add catalyst</button><button data-a="ar">Add argon (same V)</button></div>
+      <b></b>
+      <div><button id="b-pause">❚❚ Pause</button><button id="b-reset">Start over</button><label class="chk"><input type="checkbox" id="predict"> Predict first</label></div>
+    </div>
+    <div id="pred" class="predict" hidden></div>
+  </div>
+
+  <div class="card" style="flex:1 1 420px">
+    <h2>Concentrations over time</h2>
+    <canvas id="graph" width="520" height="230" aria-label="Graph of concentrations against time"></canvas>
+    <div class="legend"><span><span class="dot" style="background:#c2410c"></span>[NO₂]</span><span><span class="dot" style="background:#475569"></span>[N₂O₄]</span><span>(particles per unit volume)</span></div>
+    <h2 style="margin-top:12px">Q compared with K &nbsp;<span id="qk" style="font-weight:normal"></span></h2>
+    <div class="gauge"><div class="bar"></div><div class="k" title="K"></div><div class="q" id="qpt">Q</div></div>
+    <div class="gl"><span>Q &lt; K: net forward →</span><span>K</span><span>← net reverse: Q &gt; K</span></div>
+    <div class="rates">
+      <span>Forward rate</span><div class="rb"><i id="rf" style="background:#475569"></i></div><span id="rfv"></span>
+      <span>Reverse rate</span><div class="rb"><i id="rr" style="background:#c2410c"></i></div><span id="rrv"></span>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note">Q = [N₂O₄] / [NO₂]². Concentrations are counted in particles per unit volume, and the K values are scaled so the particles stay countable; the directions of the shifts are the real ones. Forward rate = k<sub>f</sub>[NO₂]², reverse rate = k<sub>r</sub>[N₂O₄].</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+// ---------------------------------------------------------------- model
+const TEMPS = [{label: "0 °C", K: 0.08, kr: 0.04, v: 42}, {label: "25 °C", K: 0.02, kr: 0.12, v: 62}, {label: "100 °C", K: 0.005, kr: 0.35, v: 95}];
+const VOLS = [0.5, 1, 2];
+const S = {eqm: false, nA: 120, nB: 0, nAr: 0, vi: 1, ti: 1, cat: false, t: 0, paused: false, parts: [], hist: [], marks: [], qs: null, wpx: 260, sampleT: 0, pending: null};
+const V = () => VOLS[S.vi];
+const T = () => TEMPS[S.ti];
+const K = () => T().K;
+const kr = () => T().kr * (S.cat ? 4 : 1);
+const kf = () => K() * kr();
+const rateF = () => kf() * S.nA * S.nA / V();
+const rateR = () => kr() * S.nB;
+const Q = () => S.nA ? S.nB * V() / (S.nA * S.nA) : Infinity;
+
+// ---------------------------------------------------------------- particles
+const BX = 16, BY = 16, BH = 268, WFULL = 528;
+const wTarget = () => WFULL * V() / 2;
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function spawn(type, x, y) {
+  const sp = T().v * (type === "B" ? 0.7 : type === "Ar" ? 0.85 : 1), a = rnd(0, 2 * Math.PI);
+  const p = {type, x: x != null ? x : rnd(BX + 10, BX + S.wpx - 10), y: y != null ? y : rnd(BY + 10, BY + BH - 10), vx: sp * Math.cos(a), vy: sp * Math.sin(a), flash: 0, ang: rnd(0, 6.28), spin: rnd(-2, 2)};
+  S.parts.push(p); return p;
+}
+function syncParticles() {   // make the drawn particles match the (rounded) amounts
+  for (const [type, n] of [["A", Math.round(S.nA)], ["B", Math.round(S.nB)], ["Ar", S.nAr]]) {
+    let have = S.parts.filter(p => p.type === type);
+    while (have.length < n) { have.push(spawn(type)); }
+    while (have.length > n) { const p = have.pop(); S.parts.splice(S.parts.indexOf(p), 1); }
+  }
+}
+function setSpeeds() {
+  for (const p of S.parts) {
+    const sp = T().v * (p.type === "B" ? 0.7 : p.type === "Ar" ? 0.85 : 1), m = Math.hypot(p.vx, p.vy) || 1;
+    p.vx *= sp / m; p.vy *= sp / m;
+  }
+}
+function poisson(l) { let k = 0, p = Math.exp(-l), s = p, u = Math.random(); while (u > s && k < 50) { k++; p *= l / k; s += p; } return k; }
+function forwardEvent() {
+  const As = S.parts.filter(p => p.type === "A"); if (As.length < 2) return;
+  const a = As[Math.floor(Math.random() * As.length)];
+  let b = null, bd = 1e9;
+  for (const q of As) if (q !== a) { const d = (q.x - a.x) ** 2 + (q.y - a.y) ** 2; if (d < bd) { bd = d; b = q; } }
+  S.parts.splice(S.parts.indexOf(a), 1); S.parts.splice(S.parts.indexOf(b), 1);
+  const n = spawn("B", (a.x + b.x) / 2, (a.y + b.y) / 2); n.flash = 1;
+}
+function reverseEvent() {
+  const Bs = S.parts.filter(p => p.type === "B"); if (!Bs.length) return;
+  const b = Bs[Math.floor(Math.random() * Bs.length)];
+  S.parts.splice(S.parts.indexOf(b), 1);
+  const c = Math.cos(b.ang), s = Math.sin(b.ang);
+  const p1 = spawn("A", b.x + 7 * c, b.y + 7 * s), p2 = spawn("A", b.x - 7 * c, b.y - 7 * s);
+  const sp = T().v; p1.vx = sp * c; p1.vy = sp * s; p2.vx = -sp * c; p2.vy = -sp * s; p1.flash = p2.flash = 1;
+}
+const countOf = t => S.parts.reduce((k, p) => k + (p.type === t), 0);
+function step(dt) {
+  S.t += dt;
+  // piston
+  const wt = wTarget(); S.wpx += (wt - S.wpx) * Math.min(1, dt * 5); if (Math.abs(wt - S.wpx) < 0.5) S.wpx = wt;
+  // chemistry: smooth rate laws (a real sample has ~10^23 molecules, so its concentrations do not jitter)
+  const sub = 4, h = dt / sub;
+  for (let i = 0; i < sub; i++) {
+    let dx = (rateF() - rateR()) * h;
+    dx = Math.max(-S.nB, Math.min(S.nA / 2, dx));
+    S.nA -= 2 * dx; S.nB += dx;
+  }
+  // pictures: net change shown as joining / splitting particles...
+  const tB = Math.round(S.nB);
+  let vB = countOf("B");
+  while (vB < tB && countOf("A") >= 2) { forwardEvent(); vB++; }
+  while (vB > tB) { reverseEvent(); vB--; }
+  // ...plus the forward and reverse reactions that cancel out (still happening at equilibrium)
+  let nx = poisson(Math.min(rateF(), rateR(), 12) * dt);   // capped so the picture stays readable
+  while (nx-- > 0) { if (countOf("A") >= 2) { forwardEvent(); reverseEvent(); } }
+  syncParticles();
+  // motion
+  const x0 = BX + 7, x1 = BX + S.wpx - 7, y0 = BY + 7, y1 = BY + BH - 7;
+  for (const p of S.parts) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.ang += p.spin * dt; p.flash = Math.max(0, p.flash - dt * 2);
+    if (p.x < x0) { p.x = x0; p.vx = Math.abs(p.vx); }
+    if (p.x > x1) { p.x = x1; p.vx = -Math.abs(p.vx); }
+    if (p.y < y0) { p.y = y0; p.vy = Math.abs(p.vy); }
+    if (p.y > y1) { p.y = y1; p.vy = -Math.abs(p.vy); }
+  }
+  // Q (log)
+  const q = Math.log(Math.max(Q(), 1e-6));
+  S.qs = q;
+  // history
+  S.sampleT += dt;
+  if (S.sampleT >= 0.25) { S.sampleT = 0; S.hist.push({t: S.t, a: S.nA / V(), b: S.nB / V()}); while (S.hist.length && S.hist[0].t < S.t - 90) S.hist.shift(); }
+  if (S.pending && S.t >= S.pending.at) { S.pending.done(); S.pending = null; }
+}
+
+// ---------------------------------------------------------------- drawing
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, 560, 300); hiDPI(graph, 520, 230);
+function drawBox() {
+  const g = bg; g.clearRect(0, 0, 560, 300);
+  // gas colour: brown, proportional to [NO2]
+  const cA = S.nA / V(), alpha = Math.min(0.55, cA / 240);
+  g.fillStyle = "#fff"; g.fillRect(BX, BY, S.wpx, BH);
+  g.fillStyle = `rgba(180,83,9,${alpha.toFixed(3)})`; g.fillRect(BX, BY, S.wpx, BH);
+  // temperature tint on the walls
+  const wall = ["#3b82f6", "#334155", "#dc2626"][S.ti];
+  g.strokeStyle = wall; g.lineWidth = 4; g.beginPath(); g.moveTo(BX + S.wpx, BY); g.lineTo(BX, BY); g.lineTo(BX, BY + BH); g.lineTo(BX + S.wpx, BY + BH); g.stroke();
+  // piston
+  g.fillStyle = "#94a3b8"; g.fillRect(BX + S.wpx, BY - 6, 10, BH + 12);
+  g.fillStyle = "#cbd5e1"; g.fillRect(BX + S.wpx + 10, BY + BH / 2 - 5, 560 - (BX + S.wpx + 10), 10);
+  // particles
+  for (const p of S.parts) {
+    if (p.flash > 0) { g.beginPath(); g.arc(p.x, p.y, 10 + 8 * (1 - p.flash), 0, 6.283); g.strokeStyle = `rgba(250,204,21,${p.flash})`; g.lineWidth = 2; g.stroke(); }
+    if (p.type === "A") { g.beginPath(); g.arc(p.x, p.y, 6, 0, 6.283); g.fillStyle = "#c2410c"; g.fill(); g.strokeStyle = "#7c2d12"; g.lineWidth = 1; g.stroke(); }
+    else if (p.type === "B") {
+      const c = Math.cos(p.ang) * 5, s = Math.sin(p.ang) * 5;
+      for (const k of [1, -1]) { g.beginPath(); g.arc(p.x + k * c, p.y + k * s, 5.5, 0, 6.283); g.fillStyle = "#fff"; g.fill(); g.strokeStyle = "#475569"; g.lineWidth = 2; g.stroke(); }
+    } else { g.beginPath(); g.arc(p.x, p.y, 4, 0, 6.283); g.fillStyle = "#a3a3a3"; g.fill(); }
+  }
+  g.fillStyle = "#475569"; g.font = "13px Arial"; g.textAlign = "left";
+  g.fillText(`${T().label}   ·   V = ${V()}${S.cat ? "   ·   catalyst" : ""}`, BX + 6, BY + BH + 14);
+  if (S.paused) { g.fillStyle = "rgba(15,23,42,.6)"; g.font = "bold 16px Arial"; g.fillText("Paused", BX + 8, BY + 22); }
+}
+function niceMax(v) { const steps = [10, 20, 30, 40, 50, 60, 80, 100, 120, 150, 200, 250, 300, 400]; for (const s of steps) if (v <= s) return s; return Math.ceil(v / 100) * 100; }
+function drawGraph() {
+  const g = gg, W = 520, H = 230, L = 44, R = 10, Tp = 10, Bt = 28;
+  g.clearRect(0, 0, W, H);
+  const span = 60, tEnd = Math.max(S.t, span), t0 = tEnd - span;
+  const pts = S.hist.filter(h => h.t >= t0 - 1);
+  const ymax = niceMax(Math.max(10, ...pts.map(h => Math.max(h.a, h.b))) * 1.1);
+  const X = t => L + (t - t0) / span * (W - L - R), Y = c => H - Bt - c / ymax * (H - Bt - Tp);
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let i = 0; i <= 4; i++) { const c = ymax * i / 4, y = Y(c); g.beginPath(); g.moveTo(L, y); g.lineTo(W - R, y); g.stroke(); g.fillText(Math.round(c), L - 5, y + 4); }
+  g.textAlign = "center"; g.fillText("time (s) →", (L + W - R) / 2, H - 6);
+  for (let t = Math.ceil(t0 / 10) * 10; t <= tEnd; t += 10) g.fillText(Math.round(t), X(t), H - Bt + 14);
+  // markers
+  for (const m of S.marks) if (m.t >= t0) {
+    const x = X(m.t); g.strokeStyle = "#94a3b8"; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(x, Tp); g.lineTo(x, H - Bt); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "#334155"; g.textAlign = "left"; g.font = "bold 11px Arial"; g.fillText(m.label, x + 3, Tp + 10 + (m.row || 0) * 12);
+  }
+  for (const [key, col] of [["a", "#c2410c"], ["b", "#475569"]]) {
+    g.strokeStyle = col; g.lineWidth = 2.2; g.beginPath();
+    pts.forEach((h, i) => { const x = X(h.t), y = Y(h[key]); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+  }
+  g.strokeStyle = "#1f2937"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(L, Tp); g.lineTo(L, H - Bt); g.lineTo(W - R, H - Bt); g.stroke();
+}
+let rmax = 1;
+function drawPanel() {
+  const k = K(), qs = Math.max(Q(), 1e-6), lr = Math.log10(qs / k);
+  $("qk").textContent = `Q = ${fmt(qs)}, K = ${fmt(k)}`;
+  $("qpt").style.left = (50 + Math.max(-1, Math.min(1, lr)) * 48) + "%";
+  const f = rateF(), r = rateR(); rmax = Math.max(rmax * 0.995, f, r, 0.5);
+  $("rf").style.width = (f / rmax * 100).toFixed(1) + "%"; $("rr").style.width = (r / rmax * 100).toFixed(1) + "%";
+  $("rfv").textContent = f.toFixed(1) + " /s"; $("rrv").textContent = r.toFixed(1) + " /s";
+  $("counts").textContent = `NO₂: ${Math.round(S.nA)}  ·  N₂O₄: ${Math.round(S.nB)}${S.nAr ? `  ·  Ar: ${S.nAr}` : ""}`;
+  const st = $("status");
+  let msg, eqm = false;
+  // hysteresis: random fluctuations should not flip the status back and forth
+  S.eqm = S.eqm ? Math.abs(lr) < 0.03 : Math.abs(lr) < 0.015;
+  if (S.eqm) { eqm = true; msg = "<b>At equilibrium:</b> Q ≈ K and the forward rate ≈ the reverse rate. Both reactions are still happening (watch the flashes), so the amounts stay steady: this is a <b>dynamic</b> equilibrium."; }
+  else if (lr < 0) msg = "<b>Q &lt; K:</b> the forward rate is bigger than the reverse rate, so there is a <b>net forward</b> reaction (→): NO₂ is being used up and N₂O₄ is forming.";
+  else msg = "<b>Q &gt; K:</b> the reverse rate is bigger than the forward rate, so there is a <b>net reverse</b> reaction (←): N₂O₄ is breaking apart into NO₂.";
+  st.innerHTML = msg; st.classList.toggle("eqm", eqm);
+}
+function fmt(x) { return x >= 1 ? x.toFixed(2) : x >= 0.01 ? x.toFixed(3) : x.toPrecision(2); }
+
+// ---------------------------------------------------------------- actions
+const ACT = {
+  addA: {label: "+NO₂", dir: "right", ok: () => true, run: () => { S.nA += 20; },
+    why: "Adding NO₂ raises [NO₂], so Q = [N₂O₄]/[NO₂]² falls below K. The forward reaction speeds up until Q = K again: the reaction shifts <b>right</b> and uses up some (not all) of the added NO₂."},
+  remA: {label: "−NO₂", dir: "left", ok: () => S.nA >= 24, run: () => { S.nA -= 20; },
+    why: "Removing NO₂ lowers [NO₂], so Q rises above K. The reverse reaction wins for a while: the reaction shifts <b>left</b> and replaces some of the NO₂ that was removed."},
+  addB: {label: "+N₂O₄", dir: "left", ok: () => true, run: () => { S.nB += 10; },
+    why: "Adding N₂O₄ raises the top of Q = [N₂O₄]/[NO₂]², so Q > K. The reaction shifts <b>left</b>: some N₂O₄ breaks apart into NO₂ until Q = K."},
+  remB: {label: "−N₂O₄", dir: "right", ok: () => S.nB >= 10, run: () => { S.nB -= 10; },
+    why: "Removing N₂O₄ makes Q smaller than K. The reaction shifts <b>right</b> and makes more N₂O₄ until Q = K again."},
+  heat: {label: "heat", dir: "left", ok: () => true, run: null,
+    why: "The forward reaction is exothermic, so heat acts like a product. Heating favors the endothermic (reverse) direction: <b>K gets smaller</b>, the current Q is now bigger than the new K, and the reaction shifts <b>left</b>. The gas turns browner. Temperature is the only change here that changes K itself."},
+  cool: {label: "cool", dir: "right", ok: () => true, run: null,
+    why: "The forward reaction is exothermic, so cooling favors it: <b>K gets bigger</b>, the current Q is now smaller than the new K, and the reaction shifts <b>right</b>. The gas gets paler as brown NO₂ turns into colorless N₂O₄. Temperature is the only change here that changes K itself."},
+  small: {label: "½V", dir: "right", ok: () => S.vi > 0, run: () => { S.vi--; },
+    why: "Halving the volume doubles every concentration at once. Because [NO₂] is squared in Q = [N₂O₄]/[NO₂]², Q is cut in half, so Q < K and the reaction shifts <b>right</b>, toward the side with fewer gas particles (2 NO₂ → 1 N₂O₄). Watch the color: it gets darker immediately (same NO₂ in less space), then lightens a little as the shift uses up NO₂."},
+  big: {label: "2V", dir: "left", ok: () => S.vi < VOLS.length - 1, run: () => { S.vi++; },
+    why: "Doubling the volume halves every concentration. Q doubles, so Q > K and the reaction shifts <b>left</b>, toward the side with more gas particles (1 N₂O₄ → 2 NO₂)."},
+  cat: {label: "catalyst", dir: "none", ok: () => true, run: () => { S.cat = !S.cat; },
+    why: "A catalyst speeds up the forward <b>and</b> reverse reactions by the same factor, so K does not change and <b>there is no shift</b>: the equilibrium amounts stay the same. A catalyst only helps a reaction reach equilibrium faster."},
+  ar: {label: "+Ar", dir: "none", ok: () => S.nAr < 40, run: () => { S.nAr += 10; },
+    why: "Adding argon at constant volume raises the total pressure, but it does not change [NO₂] or [N₂O₄]. Q still equals K, so <b>there is no shift</b>."}
+};
+function mark(label) { const recent = S.marks.filter(m => m.t > S.t - 8).length; S.marks.push({t: S.t, label, row: recent % 3}); }
+function apply(key, ti) {
+  const a = ACT[key];
+  if (key === "heat" || key === "cool") { S.ti = ti; setSpeeds(); }
+  else a.run();
+  syncParticles();
+  mark(key === "heat" || key === "cool" ? TEMPS[ti].label : key === "cat" ? (S.cat ? "+catalyst" : "−catalyst") : a.label);
+  if (key === "cat") $("b-cat").textContent = S.cat ? "Remove catalyst" : "Add catalyst";
+  $("lg-ar").hidden = !S.nAr;
+  updateButtons();
+}
+function request(key, ti) {
+  if (!ACT[key].ok()) return;
+  if (S.pending || !$("pred").hidden) return;
+  if (!$("predict").checked) { apply(key, ti); $("why").innerHTML = ACT[key].why; return; }
+  const what = {addA: "add 20 NO₂", remA: "remove 20 NO₂", addB: "add 10 N₂O₄", remB: "remove 10 N₂O₄", heat: `heat the container to ${TEMPS[ti] && TEMPS[ti].label}`, cool: `cool the container to ${TEMPS[ti] && TEMPS[ti].label}`,
+    small: "halve the volume", big: "double the volume", cat: S.cat ? "remove the catalyst" : "add a catalyst", ar: "add argon at constant volume"}[key];
+  const p = $("pred"); p.hidden = false; S.paused = true; $("b-pause").textContent = "▶ Run";
+  p.innerHTML = `<p><b>Predict:</b> you are about to ${what}. Which way will the equilibrium shift?</p><div>
+    <button data-p="left">← Left (more NO₂)</button><button data-p="none">No shift</button><button data-p="right">Right (more N₂O₄) →</button></div>`;
+  p.onclick = ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    const guess = b.dataset.p, ans = ACT[key].dir, ok = guess === ans;
+    const name = {left: "shift left", right: "shift right", none: "no shift"};
+    p.innerHTML = `<p class="${ok ? "fb-ok" : "fb-x"}"><b>${ok ? "Correct" : "Not quite"}: ${name[ans]}.</b> ${ok ? "" : `You said ${name[guess]}.`} Now watch it happen.</p>`;
+    apply(key, ti); $("why").innerHTML = ACT[key].why;
+    S.paused = false; $("b-pause").textContent = "❚❚ Pause";
+    S.pending = {at: S.t + 6, done: () => { p.hidden = true; }};
+  };
+}
+function updateButtons() {
+  for (const b of document.querySelectorAll("button[data-a]")) b.disabled = !ACT[b.dataset.a].ok();
+  for (const b of document.querySelectorAll("button[data-t]")) b.classList.toggle("on", +b.dataset.t === S.ti);
+}
+function reset() {
+  Object.assign(S, {eqm: false, nA: 120, nB: 0, nAr: 0, vi: 1, ti: 1, cat: false, t: 0, paused: false, parts: [], hist: [], marks: [], qs: null, wpx: wTarget(), pending: null});
+  S.wpx = WFULL / 2; S.qs = Math.log(Math.max(Q(), 1e-6)); syncParticles(); $("why").innerHTML = "Start: only NO₂ in the box. Watch it react until it reaches equilibrium, then change something.";
+  $("pred").hidden = true; $("b-cat").textContent = "Add catalyst"; $("b-pause").textContent = "❚❚ Pause"; $("lg-ar").hidden = true;
+  mark("start"); updateButtons();
+}
+
+// ---------------------------------------------------------------- wiring
+for (const b of document.querySelectorAll("button[data-a]")) b.onclick = () => request(b.dataset.a);
+for (const b of document.querySelectorAll("button[data-t]")) b.onclick = () => { const ti = +b.dataset.t; if (ti !== S.ti) request(ti > S.ti ? "heat" : "cool", ti); };
+$("b-pause").onclick = () => { if (!$("pred").hidden && S.paused) return; S.paused = !S.paused; $("b-pause").textContent = S.paused ? "▶ Run" : "❚❚ Pause"; };
+$("b-reset").onclick = reset;
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!S.paused) step(dt);
+  drawBox(); drawGraph(); drawPanel();
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("predict") === "1") $("predict").checked = true;
+  if (q.get("title") === "0") $("title").style.display = "none";
+  reset();
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+</body>
+</html>

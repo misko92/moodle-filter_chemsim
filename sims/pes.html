@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PES Builder</title>
+<style>
+:root { --ink:#1f2937; --muted:#6b7280; --line:#e2e8f0; --panel:#f8fafc; --accent:#1d4ed8; --ok:#15803d; --bad:#b91c1c; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 16px; -webkit-text-size-adjust: 100%; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 10px; }
+h2 { font-size: 17px; margin: 0 0 8px; }
+button { font: inherit; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: var(--ink); border-radius: 8px; padding: 8px 12px; min-height: 40px; touch-action: manipulation; }
+button:hover { background: #f1f5f9; }
+button:disabled { opacity: .4; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { background: #1e40af; }
+select { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+label { user-select: none; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; border-bottom: 2px solid var(--line); margin-bottom: 14px; }
+.tabs button { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.mode { display: none; }
+.mode.active { display: block; }
+.row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.col-atom { flex: 0 1 330px; min-width: 260px; }
+.col-chart { flex: 1 1 560px; min-width: 300px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+svg { display: block; width: 100%; height: auto; touch-action: none; }
+.chart { background: #fff; border: 1px solid var(--line); border-radius: 10px; }
+.pklabel { align-self: center; justify-self: end; font-size: 13px; color: var(--muted); padding-right: 4px; }
+.picker { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 8px 0; max-width: 520px; }
+.picker button { padding: 4px 0; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+.picker button small { font-size: 10px; color: var(--muted); }
+.picker button b { font-size: 16px; }
+.picker button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.picker button.on small { color: #dbeafe; }
+.picker button.right { background: #dcfce7; border-color: var(--ok); }
+.picker button.wrong { background: #fee2e2; border-color: var(--bad); }
+.config { font-size: 20px; margin: 6px 0; }
+.config span { font-weight: bold; margin-right: 6px; }
+.elname { font-size: 18px; font-weight: bold; }
+.info { margin-top: 10px; line-height: 1.45; min-height: 3em; }
+.note { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.fb { list-style: none; padding: 0; margin: 10px 0 0; }
+.fb li { padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; line-height: 1.4; }
+.fb li.x { background: #fef2f2; border-left: 4px solid var(--bad); }
+.fb li.ok { background: #f0fdf4; border-left: 4px solid var(--ok); }
+.fb li.hint { background: #eff6ff; border-left: 4px solid var(--accent); }
+table.peaks { border-collapse: collapse; width: 100%; margin-top: 8px; }
+table.peaks td, table.peaks th { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: left; font-size: 15px; }
+table.peaks th { font-size: 13px; color: var(--muted); font-weight: normal; }
+table.peaks button { min-height: 36px; padding: 4px 10px; }
+.chip { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+.big { font-size: 18px; }
+.score { font-weight: bold; color: var(--accent); }
+canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; background: #0f172a; }
+.readout { font-family: Menlo, Consolas, monospace; font-size: 14px; margin-top: 8px; line-height: 1.5; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 14px; margin-top: 6px; }
+@media (max-width: 640px) { body { padding: 8px 10px 20px; } .tabs button { padding: 8px 8px; font-size: 14px; } }
+</style>
+</head>
+<body>
+<h1 id="title">Photoelectron Spectroscopy (PES)</h1>
+<nav class="tabs" role="tablist" id="tabs">
+  <button role="tab" data-mode="explore">Explore</button>
+  <button role="tab" data-mode="measure">How PES works</button>
+  <button role="tab" data-mode="build">Build a spectrum</button>
+  <button role="tab" data-mode="identify">Identify the element</button>
+</nav>
+
+<!-- ============================== EXPLORE ============================== -->
+<section class="mode" id="m-explore">
+  <div class="row">
+    <div class="col-atom">
+      <div class="card">
+        <div class="elname" id="ex-name"></div>
+        <svg id="ex-atom" viewBox="0 0 300 300" aria-label="Shell model of the atom"></svg>
+        <div class="config" id="ex-config"></div>
+        <div class="controls">
+          <button id="ex-prev" aria-label="Remove a proton and an electron">◀ Remove</button>
+          <button id="ex-next" class="primary" aria-label="Add a proton and an electron">Add proton + electron ▶</button>
+        </div>
+      </div>
+    </div>
+    <div class="col-chart">
+      <svg id="ex-chart" class="chart" viewBox="0 0 740 352" aria-label="Photoelectron spectrum"></svg>
+      <div class="controls">
+        <label>Compare with:
+          <select id="ex-compare"></select></label>
+        <label><input type="checkbox" id="ex-labels" checked> Peak labels</label>
+      </div>
+      <div class="picker" id="ex-picker"></div>
+      <div class="card info" id="ex-info"></div>
+      <div class="note">Tap a peak to learn about it. The energy axis is logarithmic so that core and valence peaks fit on one chart, and energy <b>increases to the left</b>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== MEASURE ============================== -->
+<section class="mode" id="m-measure">
+  <div class="card" style="margin-bottom:10px">
+    In PES, high-energy photons knock electrons out of atoms. The detector measures each electron's kinetic energy (KE). The energy needed to remove it is what is left over:
+    <b>IE = hν − KE</b>. Every electron counted adds to the peak for its subshell, so the peak heights end up showing how many electrons are in each subshell.
+  </div>
+  <canvas id="ms-canvas" width="1480" height="480" aria-label="Animation of a photoelectron spectrometer"></canvas>
+  <div class="controls">
+    <button id="ms-run" class="primary">▶ Run</button>
+    <button id="ms-reset">Reset counts</button>
+    <label>Speed:
+      <select id="ms-speed"><option value="1">Slow</option><option value="4" selected>Medium</option><option value="20">Fast</option><option value="80">Very fast</option></select></label>
+    <label>Element: <select id="ms-el"></select></label>
+  </div>
+  <div class="readout" id="ms-readout"></div>
+  <svg id="ms-chart" class="chart" viewBox="0 0 740 352" aria-label="Spectrum built from counted electrons"></svg>
+  <div class="note">Idealized: every electron is equally likely to be knocked out, and the photon energy is 500 MJ/mol (X-rays), enough to remove any electron in these atoms. Numbers above the peaks are the electrons counted so far.</div>
+</section>
+
+<!-- ============================== BUILD ============================== -->
+<section class="mode" id="m-build">
+  <div class="row">
+    <div class="col-chart">
+      <div class="big">Build the spectrum of <b id="bd-target"></b></div>
+      <div class="controls">
+        <span>Add a peak:</span>
+        <span id="bd-palette"></span>
+      </div>
+      <svg id="bd-chart" class="chart" viewBox="0 0 740 352" aria-label="Spectrum you are building"></svg>
+      <div class="note">Drag a peak sideways to change its energy. Drag the round handle on top of a peak up or down to change its height. You can also use the table.</div>
+    </div>
+    <div class="col-atom" style="flex:1 1 380px">
+      <div class="card">
+        <table class="peaks" id="bd-table"></table>
+        <div class="controls" style="margin-top:12px">
+          <button id="bd-check" class="primary">Check</button>
+          <button id="bd-answer">Show answer</button>
+          <button id="bd-new">New element</button>
+        </div>
+        <div class="controls">
+          <label>Element: <select id="bd-el"></select></label>
+          <label>Positions:
+            <select id="bd-tol"><option value="0.48">Close (within ×3)</option><option value="0.18">Exact (within 50%)</option><option value="9">Order only</option></select></label>
+        </div>
+        <ul class="fb" id="bd-fb"></ul>
+        <div class="note">Solved: <span class="score" id="bd-score">0</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== IDENTIFY ============================== -->
+<section class="mode" id="m-identify">
+  <div class="row">
+    <div class="col-chart">
+      <div class="big">Which element produced this spectrum?</div>
+      <svg id="id-chart" class="chart" viewBox="0 0 740 352" aria-label="Mystery photoelectron spectrum"></svg>
+    </div>
+    <div class="col-atom" style="flex:1 1 380px">
+      <div class="card">
+        <div class="picker" id="id-picker"></div>
+        <div class="controls">
+          <button id="id-hint">Hint</button>
+          <button id="id-next" class="primary">Next spectrum</button>
+        </div>
+        <ul class="fb" id="id-fb"></ul>
+        <div class="note">Correct on the first try: <span class="score" id="id-score">0 of 0</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<p class="note">Energies: standard AP photoelectron data (MJ/mol). Peak colors: <span id="legend" class="legend" style="display:inline-flex"></span></p>
+
+<script>
+"use strict";
+const D = {"H": [["1s", 1.31, 1]], "He": [["1s", 2.37, 2]], "Li": [["1s", 6.26, 2], ["2s", 0.52, 1]], "Be": [["1s", 11.5, 2], ["2s", 0.9, 2]], "B": [["1s", 19.3, 2], ["2s", 1.36, 2], ["2p", 0.8, 1]], "C": [["1s", 28.6, 2], ["2s", 1.72, 2], ["2p", 1.09, 2]], "N": [["1s", 39.6, 2], ["2s", 2.45, 2], ["2p", 1.4, 3]], "O": [["1s", 52.6, 2], ["2s", 3.12, 2], ["2p", 1.31, 4]], "F": [["1s", 67.2, 2], ["2s", 3.88, 2], ["2p", 1.68, 5]], "Ne": [["1s", 84.0, 2], ["2s", 4.68, 2], ["2p", 2.08, 6]], "Na": [["1s", 104, 2], ["2s", 6.84, 2], ["2p", 3.67, 6], ["3s", 0.5, 1]], "Mg": [["1s", 126, 2], ["2s", 9.07, 2], ["2p", 5.31, 6], ["3s", 0.74, 2]], "Al": [["1s", 151, 2], ["2s", 12.1, 2], ["2p", 7.19, 6], ["3s", 1.09, 2], ["3p", 0.58, 1]], "Si": [["1s", 178, 2], ["2s", 15.1, 2], ["2p", 10.3, 6], ["3s", 1.46, 2], ["3p", 0.79, 2]], "P": [["1s", 208, 2], ["2s", 18.7, 2], ["2p", 13.5, 6], ["3s", 1.95, 2], ["3p", 1.01, 3]], "S": [["1s", 239, 2], ["2s", 22.7, 2], ["2p", 16.2, 6], ["3s", 2.05, 2], ["3p", 1.0, 4]], "Cl": [["1s", 273, 2], ["2s", 26.8, 2], ["2p", 20.2, 6], ["3s", 2.44, 2], ["3p", 1.25, 5]], "Ar": [["1s", 309, 2], ["2s", 31.5, 2], ["2p", 24.1, 6], ["3s", 2.82, 2], ["3p", 1.52, 6]], "K": [["1s", 347, 2], ["2s", 37.1, 2], ["2p", 29.1, 6], ["3s", 3.93, 2], ["3p", 2.38, 6], ["4s", 0.42, 1]], "Ca": [["1s", 390, 2], ["2s", 44.0, 2], ["2p", 34.6, 6], ["3s", 4.65, 2], ["3p", 3.22, 6], ["4s", 0.59, 2]], "Sc": [["1s", 433, 2], ["2s", 48.5, 2], ["2p", 39.2, 6], ["3s", 5.44, 2], ["3p", 3.24, 6], ["3d", 0.77, 1], ["4s", 0.63, 2]], "Fe": [["1s", 686, 2], ["2s", 81.9, 2], ["2p", 69.2, 6], ["3s", 9.32, 2], ["3p", 5.6, 6], ["3d", 0.87, 6], ["4s", 0.76, 2]], "Zn": [["1s", 932, 2], ["2s", 116, 2], ["2p", 99.9, 6], ["3s", 14.0, 2], ["3p", 9.33, 6], ["3d", 1.66, 10], ["4s", 0.91, 2]], "Fe\u00b2\u207a": [["1s", 688, 2], ["2s", 84.0, 2], ["2p", 71.3, 6], ["3s", 11.4, 2], ["3p", 7.7, 6], ["3d", 2.96, 6]]};
+const COL = {"1s": ["#1e40af", "#1d4ed8"], "2s": ["#991b1b", "#dc2626"], "2p": ["#14532d", "#15803d"], "3s": ["#6b21a8", "#7c3aed"], "3p": ["#9a3412", "#ea580c"], "4s": ["#115e59", "#0d9488"], "3d": ["#854d0e", "#ca8a04"]};
+const ELS = ["H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca"];
+const NAMES = {H:"Hydrogen",He:"Helium",Li:"Lithium",Be:"Beryllium",B:"Boron",C:"Carbon",N:"Nitrogen",O:"Oxygen",F:"Fluorine",Ne:"Neon",
+  Na:"Sodium",Mg:"Magnesium",Al:"Aluminum",Si:"Silicon",P:"Phosphorus",S:"Sulfur",Cl:"Chlorine",Ar:"Argon",K:"Potassium",Ca:"Calcium",Sc:"Scandium",Fe:"Iron",Zn:"Zinc","Fe²⁺":"Iron(II) ion"};
+const XT = ["Sc","Fe","Zn","Fe²⁺"];           // transition-metal teaching set (wide axis)
+const ALL = ELS.concat(XT);
+const ZX = {Sc: 21, Fe: 26, Zn: 30, "Fe²⁺": 26};
+const SUBS = ["1s","2s","2p","3s","3p","3d","4s"];
+const Z = el => ZX[el] || ELS.indexOf(el) + 1;                     // protons
+const NE = el => D[el].reduce((t, q) => t + q[2], 0);             // electrons
+const isIon = el => el.includes("⁺");
+const wide = el => !!el && D[el][0][1] > 395;
+const PREV = {Sc: "Ca", Fe: "Sc", Zn: "Fe", "Fe²⁺": "Fe"}, NEXT = {Sc: "Fe", Fe: "Zn"};
+const peaksOf = el => D[el].map(([sub, e, n]) => ({sub, e, n}));
+const $ = id => document.getElementById(id);
+const fmtE = e => e >= 100 ? e.toFixed(0) : e >= 10 ? e.toFixed(1) : e.toFixed(2);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const subHTML = (s, n) => `<span style="color:${COL[s][1]}">${s}<sup>${n}</sup></span>`;
+const configHTML = el => D[el].map(([s, , n]) => subHTML(s, n)).join(" ");
+
+// ---------------------------------------------------------------- chart (same geometry as pes.py)
+const G = {X0: 72, X1: 712, top: 16, bot: 276, EMAX: 400, EMIN: 0.30, YMAX: 6};
+const LMIN = Math.log10(G.EMIN);
+let LMAX, SPAN, PE, TICKS, AXW = null;
+const TICKS_STD = [["300",300],["200",200],["100",100],["50.0",50],["20.0",20],["10.0",10],["5.00",5],["2.00",2],["1.00",1],["0.50",0.5],["0.30",0.3]];
+const TICKS_WIDE = [["1000",1000],["500",500],["200",200],["100",100],["50.0",50],["20.0",20],["10.0",10],["5.00",5],["2.00",2],["1.00",1],["0.50",0.5],["0.30",0.3]];
+// Standard axis = the bank charts (pes.py). Wide axis (Sc, Fe, Zn, Fe²⁺): 1s goes past 400 and Zn 3d is 10 tall.
+function setAxis(w) {
+  w = !!w; if (w === AXW) return; AXW = w;
+  G.EMAX = w ? 1100 : 400; G.YMAX = w ? 10 : 6; TICKS = w ? TICKS_WIDE : TICKS_STD;
+  LMAX = Math.log10(G.EMAX); SPAN = (G.X1 - G.X0 - 40) / (LMAX - LMIN); PE = (G.bot - G.top - 20) / G.YMAX;
+}
+setAxis(false);
+const X = e => G.X0 + 20 + (LMAX - Math.log10(e)) * SPAN;
+const Einv = x => Math.pow(10, LMAX - (x - G.X0 - 20) / SPAN);
+const clampE = e => Math.min(G.EMAX * 0.95, Math.max(0.32, e));
+
+function peakPath(x, y) {
+  return `M ${(x-9).toFixed(2)},${G.bot} L ${(x-1.5).toFixed(2)},${y.toFixed(2)} L ${(x+1.5).toFixed(2)},${y.toFixed(2)} L ${(x+9).toFixed(2)},${G.bot} Z`;
+}
+function drawChart(svg, o) {
+  setAxis(o.wide); svg._wide = !!o.wide;
+  const s = [];
+  s.push(`<rect x="${G.X0}" y="${G.top}" width="${G.X1-G.X0}" height="${G.bot-G.top}" fill="#f8fafc" stroke="#cbd5e1"/>`);
+  for (let n = 0; n <= G.YMAX; n += 2) {
+    const y = G.bot - n * PE;
+    s.push(`<line x1="${G.X0}" y1="${y}" x2="${G.X1}" y2="${y}" stroke="#e2e8f0"${n ? ' stroke-dasharray="5,4"' : ""}/>`);
+    s.push(`<line x1="${G.X0}" y1="${y}" x2="${G.X0-5}" y2="${y}" stroke="#374151" stroke-width="1.5"/>`);
+    s.push(`<text x="${G.X0-8}" y="${y+4}" text-anchor="end" font-size="12" fill="#374151">${n}</text>`);
+  }
+  for (const [t, e] of TICKS) {
+    const x = X(e);
+    s.push(`<line x1="${x}" y1="${G.top}" x2="${x}" y2="${G.bot}" stroke="#e2e8f0" stroke-dasharray="5,4"/>`);
+    s.push(`<line x1="${x}" y1="${G.bot}" x2="${x}" y2="${G.bot+6}" stroke="#374151" stroke-width="1.5"/>`);
+    s.push(`<text x="${x}" y="${G.bot+20}" text-anchor="middle" font-size="11" fill="#374151">${t}</text>`);
+  }
+  for (const p of (o.ghost || [])) {
+    const x = X(p.e), y = G.bot - Math.min(p.n, G.YMAX + 0.6) * PE;
+    s.push(`<path d="${peakPath(x, y)}" fill="none" stroke="${o.ghostColor || "#475569"}" stroke-width="2" stroke-dasharray="4,3"/>`);
+    if (o.ghostLabels) s.push(`<text x="${x}" y="${y-6}" text-anchor="middle" font-size="12" fill="${o.ghostColor || "#475569"}">${p.sub}</text>`);
+  }
+  for (const p of (o.peaks || [])) {
+    if (p.n <= 0.001) continue;
+    const x = X(p.e), y = G.bot - Math.min(p.n, G.YMAX + 0.6) * PE, [f, st] = COL[p.sub];
+    const sel = o.sel === p.sub;
+    s.push(`<path d="${peakPath(x, y)}" fill="${f}" fill-opacity="0.78" stroke="${sel ? "#f59e0b" : st}" stroke-width="${sel ? 3 : 1.5}" stroke-linejoin="round"/>`);
+    if (o.labels) s.push(`<text x="${x}" y="${y-(o.handles ? 16 : 7)}" text-anchor="middle" font-size="13" font-weight="bold" fill="${st}">${p.label != null ? p.label : p.sub}</text>`);
+    if (o.handles) s.push(`<circle cx="${x}" cy="${y}" r="8" fill="#fff" stroke="${st}" stroke-width="2.5"/>`);
+  }
+  s.push(`<line x1="${G.X0}" y1="${G.top}" x2="${G.X0}" y2="${G.bot}" stroke="#1f2937" stroke-width="2.5"/>`);
+  s.push(`<line x1="${G.X0}" y1="${G.bot}" x2="${G.X1}" y2="${G.bot}" stroke="#1f2937" stroke-width="2.5"/>`);
+  const yc = (G.top + G.bot) / 2;
+  s.push(`<text x="16" y="${yc}" text-anchor="middle" font-size="13" font-weight="bold" fill="#1f2937" transform="rotate(-90,16,${yc})">Relative Number of Electrons</text>`);
+  if (o.title) s.push(`<text x="${G.X1-10}" y="${G.top+20}" text-anchor="end" font-size="14" font-weight="bold" fill="#111827">${esc(o.title)}</text>`);
+  s.push(`<text x="392" y="${G.bot+44}" text-anchor="middle" font-size="11" fill="#6b7280">← Higher IE (core electrons)${" ".repeat(12)}Lower IE (valence electrons) →</text>`);
+  s.push(`<text x="392" y="${G.bot+62}" text-anchor="middle" font-size="13" font-weight="bold" fill="#1f2937">Ionization Energy (MJ/mol)</text>`);
+  svg.innerHTML = s.join("");
+}
+function svgPoint(svg, ev) {
+  const p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY;
+  return p.matrixTransform(svg.getScreenCTM().inverse());
+}
+function hitPeak(peaks, pt) {
+  let best = null, bd = 1e9;
+  for (const p of peaks) {
+    const x = X(p.e), y = G.bot - Math.min(p.n, G.YMAX + 0.6) * PE, dx = Math.abs(pt.x - x);
+    if (dx <= 16 && pt.y >= y - 18 && pt.y <= G.bot + 8 && dx < bd) { bd = dx; best = {p, handle: Math.abs(pt.y - y) <= 18}; }
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------- element picker
+const GRID = {H:[0,0],He:[0,7],Li:[1,0],Be:[1,1],B:[1,2],C:[1,3],N:[1,4],O:[1,5],F:[1,6],Ne:[1,7],Na:[2,0],Mg:[2,1],Al:[2,2],Si:[2,3],P:[2,4],S:[2,5],Cl:[2,6],Ar:[2,7],K:[3,0],Ca:[3,1],Sc:[4,2],Fe:[4,3],Zn:[4,4],"Fe²⁺":[4,5]};
+function buildPicker(div, onPick, els = ALL) {
+  div.innerHTML = "";
+  const btns = {};
+  if (els.includes("Sc")) {
+    const l = document.createElement("div"); l.className = "pklabel"; l.textContent = "d-block:";
+    l.style.gridRow = 5; l.style.gridColumn = "1 / span 2"; div.appendChild(l);
+  }
+  for (const el of els) {
+    const b = document.createElement("button");
+    b.innerHTML = `<small>${Z(el)}</small><b>${el}</b>`;
+    b.title = NAMES[el];
+    b.setAttribute("aria-label", NAMES[el]);
+    b.style.gridRow = GRID[el][0] + 1; b.style.gridColumn = GRID[el][1] + 1;
+    b.onclick = () => onPick(el);
+    div.appendChild(b); btns[el] = b;
+  }
+  return btns;
+}
+function fillSelect(sel, items) { sel.innerHTML = items.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(""); }
+
+// ---------------------------------------------------------------- atom drawing
+const R = [0, 38, 67, 96, 126];
+function ePos(sub, k) {
+  const n = +sub[0], r = R[n];
+  let side, second;
+  if (sub[1] === "d") {
+    const a = [45, 135, 225, 315, 22, 112, 202, 68, 158, 248][k - 1] * Math.PI / 180;
+    return [150 + r * Math.cos(a), 150 + r * Math.sin(a), a];
+  }
+  if (sub[1] === "s") { side = 0; second = k === 2; }
+  else { side = 1 + (k - 1) % 3; second = k > 3; }
+  const off = n === 1 ? 24 : n === 2 ? 14 : n === 3 ? 10 : 8;
+  const ang = ([-90, 0, 90, 180][side] + (second ? off : -off)) * Math.PI / 180;
+  return [150 + r * Math.cos(ang), 150 + r * Math.sin(ang), ang];
+}
+function drawAtom(svg, el, newE, prog) {
+  const s = [], z = el ? Z(el) : 0, peaks = el ? D[el] : [];
+  const nmax = peaks.length ? Math.max(...peaks.map(([sub]) => +sub[0])) : 1;
+  for (let n = 1; n <= 4; n++) s.push(`<circle cx="150" cy="150" r="${R[n]}" fill="none" stroke="${n <= nmax ? "#94a3b8" : "#e5e7eb"}" stroke-width="${n <= nmax ? 1.5 : 1}" ${n <= nmax ? "" : 'stroke-dasharray="4,4"'}/>`);
+  s.push(`<circle cx="150" cy="150" r="22" fill="#fde68a" stroke="#b45309" stroke-width="2"/>`);
+  s.push(`<text x="150" y="156" text-anchor="middle" font-size="17" font-weight="bold" fill="#78350f">+${z}</text>`);
+  for (const [sub, , n] of peaks) {
+    for (let k = 1; k <= n; k++) {
+      let [x, y, ang] = ePos(sub, k);
+      const isNew = newE && newE.sub === sub && newE.k === k;
+      if (isNew && prog < 1) [x, y] = lerpXY(ang, R[+sub[0]], prog);
+      s.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="${COL[sub][1]}" stroke="#fff" stroke-width="1.5"/>`);
+    }
+  }
+  const ne = el ? NE(el) : 0;
+  s.push(`<text x="10" y="292" font-size="12" fill="#6b7280">Nucleus charge +${z}  ·  ${ne} electron${ne === 1 ? "" : "s"}${el && isIon(el) ? "  ·  ion charge 2+" : ""}</text>`);
+  svg.innerHTML = s.join("");
+}
+function lerpXY(ang, r1, prog) {
+  const t = 1 - Math.pow(1 - Math.min(prog, 1), 3), r = 190 + (r1 - 190) * t;
+  return [150 + r * Math.cos(ang), 150 + r * Math.sin(ang)];
+}
+function legend() {
+  $("legend").innerHTML = SUBS.map(s => `<span><span class="chip" style="background:${COL[s][1]}"></span>${s}</span>`).join("");
+}
+
+// ---------------------------------------------------------------- explanations
+const NOTES = {
+  H: "Hydrogen has one electron, so one short peak.",
+  He: "Helium's 1s peak is twice as tall as hydrogen's (2 electrons) and at a higher energy: two protons pull on electrons in the same shell.",
+  Li: "Lithium starts a new shell. The 2s electron is farther from the nucleus and shielded by the two 1s electrons, so it is very easy to remove: its peak is far to the right.",
+  Be: "Both peaks moved to a higher energy than in lithium: one more proton, same shells.",
+  B: "Boron's 2p peak (0.80 MJ/mol) is at a lower energy than beryllium's 2s peak (0.90 MJ/mol). A 2p electron is higher in energy than a 2s electron, so it is easier to remove. This is why boron's first ionization energy is lower than beryllium's.",
+  C: "Every peak moved to a higher energy than in boron: one more proton.",
+  N: "Nitrogen's three 2p electrons are each in a separate 2p orbital.",
+  O: "Oxygen's 2p peak (1.31 MJ/mol) is at a lower energy than nitrogen's (1.40 MJ/mol) even though oxygen has one more proton. Oxygen's fourth 2p electron has to pair up in an orbital, and the repulsion between the paired electrons makes it easier to remove.",
+  F: "The 2p peak is 5 tall: five 2p electrons.",
+  Ne: "Neon fills the second shell. Its 2p electrons are held more tightly than those of any other element in period 2.",
+  Na: "Sodium starts the third shell. The 3s electron (0.50 MJ/mol) is much easier to remove than any core electron: notice the big gap between the 2p and 3s peaks.",
+  Mg: "Every peak moved to a higher energy than in sodium: one more proton pulls on every electron.",
+  Al: "Aluminum's 3p peak (0.58 MJ/mol) is at a lower energy than magnesium's 3s peak (0.74 MJ/mol): a 3p electron is higher in energy and easier to remove.",
+  Si: "Silicon has two 3p electrons in separate 3p orbitals.",
+  P: "Phosphorus has three 3p electrons, one in each 3p orbital.",
+  S: "Sulfur's 3p peak (1.00 MJ/mol) is slightly below phosphorus's (1.01 MJ/mol): the paired 3p electron repels its partner, the same effect as oxygen vs nitrogen.",
+  Cl: "The 3p peak is 5 tall: five 3p electrons.",
+  Ar: "Argon fills the 3s and 3p subshells. Its 1s electrons need 309 MJ/mol: about 200 times the energy of a 3p electron.",
+  K: "Potassium starts the fourth shell. Its 4s electron (0.42 MJ/mol) is even easier to remove than sodium's 3s electron: it is farther from the nucleus. The 3s and 3p electrons are now core electrons, and every core peak moved left compared with argon.",
+  Ca: "Calcium fills the 4s subshell: the 4s peak is 2 tall and at a higher energy than potassium's (0.59 vs 0.42 MJ/mol). Its 1s electrons need 390 MJ/mol, almost 1000 times the energy of a 4s electron.",
+  Sc: "Scandium is the first transition metal: after 4s fills, the next electron goes into 3d. Look where the 3d peak landed: to the <b>left</b> of the 4s peak (0.77 vs 0.63 MJ/mol). Once 3d has electrons, they are held more tightly than the 4s electrons. (The 1s peak, 433 MJ/mol, is off the usual scale, so this chart goes up to 1000.)",
+  Fe: "Iron is 3d⁶ 4s². The 3d peak is still to the left of the 4s peak, so the 4s electrons are the easiest to remove. That is why iron loses its two 4s electrons first when it forms Fe²⁺: tap Fe²⁺ to compare.",
+  Zn: "Zinc fills the 3d subshell (the 3d peak is 10 tall). Its 3d electrons (about 1.7 MJ/mol) are now held much more tightly than the 4s electrons (0.91), which is why zinc only forms Zn²⁺. Its 1s electrons need about 930 MJ/mol.",
+  "Fe²⁺": "Fe²⁺ has the same 26 protons as iron but only 24 electrons. The <b>4s peak is gone</b> (those were the two electrons removed) and the 3d peak still holds 6 electrons: Fe²⁺ is [Ar] 3d⁶, not [Ar] 3d⁴ 4s². With fewer electrons repelling each other, every peak moves to a higher energy than in neutral iron. (Ion energies are estimates: what matters is which peak disappeared.)"
+};
+function summary(el) {
+  const k = D[el].length, z = NE(el);
+  return `<b>${NAMES[el]} (${el})</b> has ${isIon(el) ? `${Z(el)} protons and ` : ""}${z} electron${z === 1 ? "" : "s"} in ${k} occupied subshell${k === 1 ? "" : "s"}, so its spectrum has ${k} peak${k === 1 ? "" : "s"}. The peak heights add up to ${z}.<br><br>${NOTES[el]}`;
+}
+function peakInfo(el, sub, cmp) {
+  const t = D[el].find(q => q[0] === sub); if (!t) return summary(el);
+  const [, e, n] = t, nmax = Math.max(...D[el].map(q => +q[0][0])), shell = +sub[0];
+  let h = `<b>${sub} peak of ${el}</b>: ${n} electron${n === 1 ? "" : "s"}, ${fmtE(e)} MJ/mol.<br>`;
+  const last = D[el][D[el].length - 1][0] === sub;
+  if (sub === "3d") {
+    h += `These are <b>3d electrons</b>: for transition metals they count as valence electrons along with the 4s electrons.`;
+    h += D[el].some(q => q[0] === "4s")
+      ? ` The 3d peak sits to the <b>left</b> of the 4s peak: once the 3d subshell has electrons, they are held more tightly than the 4s electrons. So when a transition metal forms an ion, it loses its <b>4s electrons first</b>.`
+      : ` There is no 4s peak: the 4s electrons were the first ones removed when the ion formed, so the 3d electrons are now the outermost.`;
+    if (last && isIon(el)) h += ` The lowest-energy peak is the energy to remove one more electron from ${el} (iron's third ionization energy): about ${Math.round(e * 1000)} kJ/mol.`;
+  } else if (shell === nmax) {
+    h += `These are <b>valence electrons</b> (n = ${shell}): the farthest from the nucleus and the most shielded, so they are the easiest to remove.`;
+    if (last) h += ` The lowest-energy peak gives the first ionization energy: about ${Math.round(e * 1000)} kJ/mol.`;
+    if (sub === "4s" && D[el].some(q => q[0] === "3d")) h += ` Even though 4s filled before 3d, the 4s electrons are now the easiest to remove.`;
+  } else h += `These are <b>core electrons</b> (n = ${shell}): closer to the nucleus and shielded by fewer electrons, so it takes much more energy to remove them.`;
+  if (sub[1] === "p") h += ` The ${sub} electrons are a little higher in energy than the ${shell}s electrons, so the ${sub} peak sits just to the right of the ${shell}s peak.`;
+  if (cmp && cmp !== el) {
+    const c = D[cmp].find(q => q[0] === sub);
+    if (c) {
+      const dz = Z(el) - Z(cmp), de = NE(el) - NE(cmp);
+      if (dz === 0 && de !== 0) h += `<br><br>Compared with ${cmp} (${fmtE(c[1])} MJ/mol), this peak is at a <b>${de < 0 ? "higher" : "lower"}</b> energy: both have ${Z(el)} protons, but ${de < 0 ? el : cmp} has ${Math.abs(de)} fewer electrons. Less electron–electron repulsion means each remaining electron is held more tightly.`;
+      else if (dz > 0 && e > c[1]) h += `<br><br>Compared with ${cmp} (${fmtE(c[1])} MJ/mol), this peak is at a <b>higher</b> energy: ${el} has ${dz} more proton${dz === 1 ? "" : "s"}, so the nucleus pulls harder on these electrons.`;
+      else if (dz < 0 && e < c[1]) h += `<br><br>Compared with ${cmp} (${fmtE(c[1])} MJ/mol), this peak is at a <b>lower</b> energy: ${el} has ${-dz} fewer proton${dz === -1 ? "" : "s"}, so the nucleus pulls less on these electrons.`;
+      else h += `<br><br>Compared with ${cmp} (${fmtE(c[1])} MJ/mol): this is one of the exceptions. See the note for ${dz > 0 ? el : cmp}: ${NOTES[dz > 0 ? el : cmp]}`;
+    } else h += `<br><br>${cmp} has no ${sub} electrons, so it has no ${sub} peak.${isIon(cmp) && sub === "4s" ? " The 4s electrons are the first ones lost when iron forms an ion." : ""}`;
+  }
+  return h;
+}
+
+// ================================================================= EXPLORE
+const ex = {el: "Na", shown: peaksOf("Na"), from: null, to: null, t0: 0, newE: null, sel: null, raf: 0};
+function exCompare() {
+  const v = $("ex-compare").value;
+  if (v === "none") return null;
+  const i = ELS.indexOf(ex.el);
+  if (v === "prev") return i > 0 ? ELS[i - 1] : PREV[ex.el] || null;
+  if (v === "next") return i >= 0 && i < ELS.length - 1 ? ELS[i + 1] : NEXT[ex.el] || null;
+  return v;
+}
+function interp(a, b, t) {
+  const m = {};
+  for (const p of a) m[p.sub] = {e0: p.e, n0: p.n, e1: p.e, n1: 0};
+  for (const p of b) { if (m[p.sub]) { m[p.sub].e1 = p.e; m[p.sub].n1 = p.n; } else m[p.sub] = {e0: p.e, n0: 0, e1: p.e, n1: p.n}; }
+  return SUBS.filter(s => m[s]).map(s => { const q = m[s], l0 = Math.log10(q.e0), l1 = Math.log10(q.e1);
+    return {sub: s, e: Math.pow(10, l0 + (l1 - l0) * t), n: q.n0 + (q.n1 - q.n0) * t}; });
+}
+function exRender(prog) {
+  const cmp = exCompare();
+  drawChart($("ex-chart"), {peaks: ex.shown, labels: $("ex-labels").checked, sel: ex.sel,
+    ghost: cmp ? peaksOf(cmp) : null, ghostLabels: false, wide: wide(ex.el) || wide(cmp), title: cmp ? `${ex.el} (filled)  vs  ${cmp} (dashed)` : `${NAMES[ex.el]} (${ex.el})`});
+  drawAtom($("ex-atom"), ex.el, ex.newE, prog == null ? 1 : prog);
+}
+function exSet(el) {
+  const old = ex.el; ex.el = el; ex.sel = null;
+  ex.from = ex.shown.map(p => ({...p})); ex.to = peaksOf(el); ex.t0 = performance.now();
+  ex.newE = null;
+  if (ELS.includes(el) && ELS.indexOf(el) === ELS.indexOf(old) + 1) { const last = D[el][D[el].length - 1]; ex.newE = {sub: last[0], k: last[2]}; }
+  $("ex-name").textContent = `${NAMES[el]} (${el}), Z = ${Z(el)}${isIon(el) ? `, ${NE(el)} electrons` : ""}`;
+  $("ex-config").innerHTML = configHTML(el);
+  const i = ELS.indexOf(el);
+  $("ex-prev").disabled = i < 1; $("ex-next").disabled = i < 0 || i === ELS.length - 1;
+  for (const k in ex.btns) ex.btns[k].classList.toggle("on", k === el);
+  $("ex-info").innerHTML = summary(el);
+  cancelAnimationFrame(ex.raf);
+  const step = now => {
+    const t = Math.min(1, (now - ex.t0) / 700), te = 1 - Math.pow(1 - t, 3);
+    ex.shown = interp(ex.from, ex.to, te).filter(p => p.n > 0.005);
+    exRender(t);
+    if (t < 1) ex.raf = requestAnimationFrame(step); else { ex.shown = ex.to; exRender(1); }
+  };
+  ex.raf = requestAnimationFrame(step);
+}
+function exInit() {
+  ex.btns = buildPicker($("ex-picker"), el => exSet(el));
+  fillSelect($("ex-compare"), [["prev", "the one before"], ["next", "the one after"], ["none", "nothing"]].concat(ALL.map(e => [e, NAMES[e]])));
+  $("ex-prev").onclick = () => { const i = ELS.indexOf(ex.el); if (i > 0) exSet(ELS[i - 1]); };
+  $("ex-next").onclick = () => { const i = ELS.indexOf(ex.el); if (i >= 0 && i < ELS.length - 1) exSet(ELS[i + 1]); };
+  $("ex-compare").onchange = () => { exRender(1); if (ex.sel) $("ex-info").innerHTML = peakInfo(ex.el, ex.sel, exCompare()); };
+  $("ex-labels").onchange = () => exRender(1);
+  $("ex-chart").addEventListener("pointerdown", ev => {
+    setAxis($("ex-chart")._wide);
+    const h = hitPeak(ex.shown, svgPoint($("ex-chart"), ev));
+    ex.sel = h ? h.p.sub : null;
+    $("ex-info").innerHTML = h ? peakInfo(ex.el, h.p.sub, exCompare()) : summary(ex.el);
+    exRender(1);
+  });
+}
+
+// ================================================================= MEASURE
+const ms = {el: "Na", running: false, photons: [], electrons: [], counts: {}, total: 0, last: null, acc: 0, tPrev: 0, raf: 0, flash: 0};
+const CW = 740, CH = 240, SRC = 95, ATOM = 255, DET = 668;
+function msReset() { ms.photons = []; ms.electrons = []; ms.counts = {}; ms.total = 0; ms.last = null; ms.flash = 0; msDrawChart(); msReadout(); msDraw(); }
+const hnu = () => wide(ms.el) ? 1500 : 500;   // photon energy, MJ/mol (harder X-rays for the heavier atoms)
+function msDrawChart() {
+  const z = NE(ms.el);
+  const peaks = D[ms.el].map(([sub, e]) => { const c = ms.counts[sub] || 0; return {sub, e, n: ms.total ? c / ms.total * z : 0, label: String(c)}; });
+  drawChart($("ms-chart"), {peaks, labels: true, title: `${NAMES[ms.el]}: ${ms.total} electron${ms.total === 1 ? "" : "s"} counted`, ghost: ms.total ? null : peaksOf(ms.el).map(p => ({...p, n: 0.15})), ghostColor: "#cbd5e1", wide: wide(ms.el)});
+}
+function msReadout() {
+  const L = ms.last, HNU = hnu();
+  $("ms-readout").innerHTML = `Photon energy hν = ${HNU} MJ/mol<br>` + (L
+    ? `Last electron: KE = ${(HNU - L.e).toFixed(2)} MJ/mol  →  IE = ${HNU} − ${(HNU - L.e).toFixed(2)} = <b>${fmtE(L.e)} MJ/mol</b>  →  counted in the <b style="color:${COL[L.sub][1]}">${L.sub}</b> peak`
+    : "Press Run to start firing photons at the sample.");
+}
+function pickElectron(el) {
+  let r = Math.random() * NE(el);
+  for (const [sub, e, n] of D[el]) { if (r < n) return {sub, e}; r -= n; }
+  const l = D[el][D[el].length - 1]; return {sub: l[0], e: l[1]};
+}
+function msStep(now) {
+  const dt = Math.min(0.05, (now - ms.tPrev) / 1000); ms.tPrev = now;
+  const sp = +$("ms-speed").value;
+  if (ms.running) {
+    ms.acc += dt * 1.2 * sp;
+    while (ms.acc >= 1) { ms.acc -= 1; if (ms.photons.length < 60) ms.photons.push({x: SRC, y: 120 + (Math.random() - 0.5) * 16}); }
+  }
+  const vp = 420 * Math.min(sp, 6);
+  for (const p of ms.photons) p.x += vp * dt;
+  for (const p of ms.photons.filter(p => p.x >= ATOM - 14)) {
+    const HNU = hnu(), pick = pickElectron(ms.el), ke = HNU - pick.e;
+    const ang = (Math.random() - 0.5) * 0.5;
+    const v = (120 + 260 * Math.sqrt(ke / HNU)) * Math.min(sp, 6);
+    ms.electrons.push({...pick, x: ATOM, y: 120, vx: v * Math.cos(ang), vy: v * Math.sin(ang)});
+    ms.flash = 1;
+  }
+  ms.photons = ms.photons.filter(p => p.x < ATOM - 14);
+  let changed = false;
+  for (const e of ms.electrons) {
+    e.x += e.vx * dt; e.y += e.vy * dt;
+    if (e.y < 70 || e.y > 170) { e.vy = -e.vy; e.y = Math.max(70, Math.min(170, e.y)); }
+    if (e.x >= DET) { e.done = true; ms.counts[e.sub] = (ms.counts[e.sub] || 0) + 1; ms.total++; ms.last = e; changed = true; }
+  }
+  ms.electrons = ms.electrons.filter(e => !e.done);
+  ms.flash = Math.max(0, ms.flash - dt * 4);
+  if (changed) { msDrawChart(); msReadout(); }
+  msDraw();
+  if (ms.running || ms.photons.length || ms.electrons.length) ms.raf = requestAnimationFrame(msStep);
+  else ms.raf = 0;
+}
+function msDraw() {
+  const c = $("ms-canvas"), g = c.getContext("2d"), k = c.width / CW;
+  g.setTransform(k, 0, 0, k, 0, 0);
+  g.fillStyle = "#0f172a"; g.fillRect(0, 0, CW, CH);
+  g.font = "13px Arial"; g.textAlign = "center";
+  // source
+  g.fillStyle = "#334155"; g.fillRect(14, 92, 72, 56); g.fillStyle = "#e2e8f0"; g.fillText("X-ray", 50, 116); g.fillText("source", 50, 132);
+  // detector
+  g.fillStyle = "#334155"; g.fillRect(DET, 60, 58, 120); g.fillStyle = "#e2e8f0";
+  g.save(); g.translate(DET + 33, 120); g.rotate(-Math.PI / 2); g.fillText("Electron detector", 0, 0); g.restore();
+  g.fillStyle = "#94a3b8"; g.fillText("measures KE", DET + 29, 198);
+  // atom
+  const nmax = Math.max(...D[ms.el].map(q => +q[0][0]));
+  for (let n = 1; n <= nmax; n++) { g.beginPath(); g.arc(ATOM, 120, 9 + n * 11, 0, 2 * Math.PI); g.strokeStyle = "#64748b"; g.lineWidth = 1; g.stroke(); }
+  g.beginPath(); g.arc(ATOM, 120, 8, 0, 2 * Math.PI); g.fillStyle = ms.flash > 0 ? `rgba(253,230,138,${0.5 + 0.5 * ms.flash})` : "#fde68a"; g.fill();
+  if (ms.flash > 0) { g.beginPath(); g.arc(ATOM, 120, 46 + 10 * (1 - ms.flash), 0, 2 * Math.PI); g.strokeStyle = `rgba(250,204,21,${ms.flash})`; g.lineWidth = 2; g.stroke(); }
+  g.fillStyle = "#e2e8f0"; g.fillText(`${ms.el} ${isIon(ms.el) ? "ions" : "atoms"} (sample)`, ATOM, 186);
+  // photons
+  g.strokeStyle = "#facc15"; g.lineWidth = 2;
+  for (const p of ms.photons) { g.beginPath(); for (let i = 0; i <= 24; i++) { const x = p.x - 24 + i; const y = p.y + 4 * Math.sin(i / 2.2 + p.x / 6); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+  // electrons
+  for (const e of ms.electrons) { g.beginPath(); g.arc(e.x, e.y, 5, 0, 2 * Math.PI); g.fillStyle = COL[e.sub][1]; g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 1; g.stroke(); }
+  g.textAlign = "left"; g.fillStyle = "#94a3b8"; g.font = "12px Arial";
+  g.fillText("photon (hν)", 100, 222); g.fillText("ejected electron: faster = more KE = held less tightly", 300, 222);
+}
+function msInit() {
+  fillSelect($("ms-el"), ALL.map(e => [e, `${NAMES[e]} (${e})`])); $("ms-el").value = ms.el;
+  $("ms-el").onchange = () => { ms.el = $("ms-el").value; msReset(); };
+  $("ms-run").onclick = () => {
+    ms.running = !ms.running; $("ms-run").textContent = ms.running ? "❚❚ Pause" : "▶ Run";
+    if (!ms.raf) { ms.tPrev = performance.now(); ms.raf = requestAnimationFrame(msStep); }
+  };
+  $("ms-reset").onclick = msReset;
+  msReset();
+}
+function msStop() { ms.running = false; $("ms-run").textContent = "▶ Run"; }
+
+// ================================================================= BUILD
+const bd = {el: "Na", peaks: [], drag: null, sel: null, showAns: false, score: 0, solved: false};
+function bdRender() {
+  drawChart($("bd-chart"), {peaks: bd.peaks, labels: true, handles: true, sel: bd.sel,
+    ghost: bd.showAns ? peaksOf(bd.el) : null, ghostLabels: true, ghostColor: "#475569", wide: wide(bd.el)});
+  $("bd-target").textContent = `${NAMES[bd.el]} (${bd.el})`;
+  const pal = $("bd-palette"); pal.innerHTML = "";
+  for (const s of SUBS) {
+    const b = document.createElement("button"); b.innerHTML = `<span class="chip" style="background:${COL[s][1]}"></span>${s}`;
+    b.disabled = bd.peaks.some(p => p.sub === s); b.style.marginRight = "4px";
+    b.onclick = () => { bdAdd(s); }; pal.appendChild(b);
+  }
+  const rows = [`<tr><th>Peak</th><th>Electrons</th><th>Energy (MJ/mol)</th><th></th></tr>`];
+  if (!bd.peaks.length) rows.push(`<tr><td colspan="4" class="note">No peaks yet. Use the buttons above the chart to add one for each occupied subshell.</td></tr>`);
+  bd.peaks.forEach((p, i) => rows.push(`<tr><td><span class="chip" style="background:${COL[p.sub][1]}"></span><b>${p.sub}</b></td>
+    <td><button data-a="n-" data-i="${i}" aria-label="fewer">−</button> <b>${p.n}</b> <button data-a="n+" data-i="${i}" aria-label="more">+</button></td>
+    <td><button data-a="e+" data-i="${i}" aria-label="higher energy">◀</button> ${fmtE(p.e)} <button data-a="e-" data-i="${i}" aria-label="lower energy">▶</button></td>
+    <td><button data-a="del" data-i="${i}" aria-label="remove">✕</button></td></tr>`));
+  $("bd-table").innerHTML = rows.join("");
+}
+function bdAdd(s) {
+  const k = bd.peaks.length; bd.peaks.push({sub: s, e: clampE(5 * Math.pow(0.72, k)), n: 1}); bd.sel = s; bdTouched(); bdRender();
+}
+function bdTouched() { if (!bd.solved) $("bd-fb").innerHTML = ""; }
+function bdNew(el) {
+  if (!el) { const pool = ELS.filter(e => e !== bd.el && Z(e) > 2); el = pool[Math.floor(Math.random() * pool.length)]; }
+  setAxis(wide(el)); bd.el = el; $("bd-el").value = el; bd.peaks = []; bd.sel = null; bd.showAns = false; bd.solved = false;
+  $("bd-answer").textContent = "Show answer"; $("bd-fb").innerHTML = ""; bdRender();
+}
+function bdCheck() {
+  const T = D[bd.el], tm = {}, um = {}, out = [], tol = +$("bd-tol").value;
+  T.forEach(([s, e, n]) => tm[s] = {e, n}); bd.peaks.forEach(p => um[p.sub] = p);
+  const missing = T.filter(([s]) => !um[s]).length;
+  if (missing) out.push(["x", `You are missing ${missing === 1 ? "a peak" : missing + " peaks"}. ${NAMES[bd.el]} has electrons in ${T.length} subshell${T.length === 1 ? "" : "s"}. Write its electron configuration to see which.`]);
+  for (const p of bd.peaks) if (!tm[p.sub]) out.push(["x", `${NAMES[bd.el]} has no electrons in ${p.sub}. Remove that peak.${p.sub === "4s" && isIon(bd.el) ? " When iron forms Fe²⁺, the 4s electrons are the ones lost." : ""}`]);
+  for (const [s, , n] of T) { const u = um[s]; if (u && u.n !== n) out.push(["x", `The ${s} peak is too ${u.n > n ? "tall" : "short"}. How many electrons does ${bd.el} have in its ${s} subshell?${s === "3d" && isIon(bd.el) ? " (Which electrons did iron lose to become Fe²⁺?)" : ""}`]); }
+  const present = T.filter(([s]) => um[s]);
+  let orderOK = true;
+  for (let i = 0; i + 1 < present.length; i++) {
+    const a = present[i][0], b = present[i + 1][0];
+    if (um[a].e <= um[b].e) { orderOK = false; out.push(["x", `The ${a} electrons are held more tightly than the ${b} electrons, so the ${a} peak must be to the <b>left</b> of the ${b} peak (higher energy).`]); }
+  }
+  if (orderOK && tol < 5) for (const [s, e] of present) {
+    const d = Math.log10(um[s].e / e);
+    if (Math.abs(d) > tol) out.push(["x", `The ${s} peak is at ${d > 0 ? "too high" : "too low"} an energy. Move it ${d > 0 ? "to the right" : "to the left"}${Math.abs(d) > 0.8 ? ", a long way" : ""}.${+s[0] < Math.max(...T.map(q => +q[0][0])) && s !== "3d" ? " Remember: core electrons need far more energy than valence electrons." : ""}`]);
+  }
+  if (!out.length) {
+    out.push(["ok", `<b>Correct!</b> ${NAMES[bd.el]}: ${configHTML(bd.el)}. Your peaks are shown with the real ones (dashed).`]);
+    if (!bd.solved) { bd.score++; $("bd-score").textContent = bd.score; }
+    bd.solved = true; bd.showAns = true; $("bd-answer").textContent = "Hide answer";
+  }
+  $("bd-fb").innerHTML = out.map(([c, t]) => `<li class="${c}">${t}</li>`).join("");
+  bdRender();
+}
+function bdInit() {
+  fillSelect($("bd-el"), ALL.map(e => [e, `${NAMES[e]} (${e})`]));
+  $("bd-el").onchange = () => bdNew($("bd-el").value);
+  $("bd-new").onclick = () => bdNew();
+  $("bd-check").onclick = bdCheck;
+  $("bd-answer").onclick = () => { bd.showAns = !bd.showAns; $("bd-answer").textContent = bd.showAns ? "Hide answer" : "Show answer"; bdRender(); };
+  $("bd-tol").onchange = () => bdTouched();
+  $("bd-table").addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    const p = bd.peaks[+b.dataset.i], a = b.dataset.a; if (!p) return;
+    setAxis(wide(bd.el));
+    if (a === "n+") p.n = Math.min(G.YMAX, p.n + 1);
+    if (a === "n-") p.n = Math.max(1, p.n - 1);
+    if (a === "e+") p.e = clampE(p.e * 1.15);
+    if (a === "e-") p.e = clampE(p.e / 1.15);
+    if (a === "del") bd.peaks.splice(+b.dataset.i, 1);
+    bd.sel = a === "del" ? null : p.sub; bdTouched(); bdRender();
+  });
+  const svg = $("bd-chart");
+  svg.addEventListener("pointerdown", ev => {
+    setAxis(svg._wide);
+    const pt = svgPoint(svg, ev), h = hitPeak(bd.peaks, pt);
+    if (!h) { bd.sel = null; bdRender(); return; }
+    bd.drag = {p: h.p, mode: h.handle ? "h" : "x", dx: pt.x - X(h.p.e)}; bd.sel = h.p.sub;
+    svg.setPointerCapture(ev.pointerId); ev.preventDefault(); bdRender();
+  });
+  svg.addEventListener("pointermove", ev => {
+    if (!bd.drag) return;
+    setAxis(svg._wide);
+    const pt = svgPoint(svg, ev), p = bd.drag.p;
+    if (bd.drag.mode === "h") p.n = Math.max(1, Math.min(G.YMAX, Math.round((G.bot - pt.y) / PE)));
+    else p.e = clampE(Einv(pt.x - bd.drag.dx));
+    bdTouched(); bdRender();
+  });
+  const end = () => { bd.drag = null; };
+  svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
+}
+
+// ================================================================= IDENTIFY
+const id = {el: null, tries: 0, done: false, right: 0, total: 0, hint: 0};
+function idNew() {
+  const pool = ELS.filter(e => e !== id.el); id.el = pool[Math.floor(Math.random() * pool.length)];
+  id.tries = 0; id.done = false; id.hint = 0; $("id-fb").innerHTML = "";
+  for (const k in id.btns) id.btns[k].className = "";
+  drawChart($("id-chart"), {peaks: peaksOf(id.el), labels: false, title: "Unknown element"});
+}
+function idPick(el) {
+  if (id.done) return;
+  const fb = $("id-fb");
+  if (id.tries === 0) id.total++;
+  id.tries++;
+  if (el === id.el) {
+    id.done = true; if (id.tries === 1) id.right++;
+    id.btns[el].className = "right";
+    fb.innerHTML = `<li class="ok"><b>Yes: ${NAMES[el]}.</b> ${configHTML(el)}. ${D[el].length} peaks for ${D[el].length} subshells, and the heights add up to ${Z(el)} electrons.</li>` + fb.innerHTML;
+    drawChart($("id-chart"), {peaks: peaksOf(id.el), labels: true, title: `${NAMES[el]} (${el})`});
+  } else {
+    id.btns[el].className = "wrong";
+    const kt = D[id.el].length, kp = D[el].length;
+    const why = kp !== kt
+      ? `${NAMES[el]} has electrons in ${kp} subshell${kp === 1 ? "" : "s"}, so its spectrum would have ${kp} peak${kp === 1 ? "" : "s"}. This spectrum has ${kt}.`
+      : `${NAMES[el]} would also have ${kp} peaks, but it has ${Z(el)} electrons, so its peak heights would add up to ${Z(el)}. Add up the heights in this spectrum.`;
+    fb.innerHTML = `<li class="x">Not ${NAMES[el]}. ${why}</li>` + fb.innerHTML;
+  }
+  $("id-score").textContent = `${id.right} of ${id.total}`;
+}
+const HINTS = ["Count the peaks. Each peak is one occupied subshell (1s, 2s, 2p, 3s, 3p, 4s).",
+  "Add up the peak heights. That is the total number of electrons, which equals the atomic number.",
+  "Look at the last peak on the right: its height tells you how many electrons are in the outermost subshell."];
+function idInit() {
+  id.btns = buildPicker($("id-picker"), idPick, ELS);
+  $("id-next").onclick = idNew;
+  $("id-hint").onclick = () => { if (id.done) return; $("id-fb").innerHTML += `<li class="hint">${HINTS[Math.min(id.hint, HINTS.length - 1)]}</li>`; id.hint++; };
+  idNew();
+}
+
+// ================================================================= tabs and URL options
+function setMode(m) {
+  for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  if (m !== "measure") msStop();
+  if (m === "measure") msDraw();
+}
+(function init() {
+  legend(); exInit(); msInit(); bdInit(); idInit();
+  const q = new URLSearchParams(location.search);
+  let el = (q.get("el") || "").trim(); if (/^Fe2\+?$/.test(el)) el = "Fe²⁺";
+  const mode = q.get("mode") || "explore";
+  if (el && D[el]) { ms.el = el; $("ms-el").value = el; msReset(); bdNew(el); }
+  else bdNew("Na");
+  if (q.get("compare")) $("ex-compare").value = q.get("compare");
+  ex.el = el && D[el] ? el : "Na"; ex.shown = peaksOf(ex.el); exSet(ex.el);
+  if (q.get("tabs") === "0") { $("tabs").style.display = "none"; $("title").style.display = "none"; }
+  for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => setMode(b.dataset.mode);
+  setMode(["explore", "measure", "build", "identify"].includes(mode) ? mode : "explore");
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+</body>
+</html>
