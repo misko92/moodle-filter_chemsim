@@ -32,7 +32,8 @@ use filter_chemsim\local\sims;
  */
 class text_filter extends \core_filters\text_filter {
     /** @var string Shortcode pattern: name, then optional key=value pairs. */
-    private const PATTERN = '/\[chemsim\s+([a-z][a-z0-9_]*)((?:(?:\s|&nbsp;)+[a-z][a-z0-9_]*=[^\s\]&<"\']+)*)(?:\s|&nbsp;)*\]/i';
+    private const PATTERN = '/\[chemsim(?:\s|&nbsp;|\x{00A0})+([a-z][a-z0-9_]*)' .
+        '((?:(?:\s|&nbsp;|\x{00A0})+[a-z][a-z0-9_]*=[^\s\x{00A0}\]&<"\']+)*)(?:\s|&nbsp;|\x{00A0})*\]/iu';
 
     #[\Override]
     public function filter($text, array $options = []) {
@@ -71,7 +72,7 @@ class text_filter extends \core_filters\text_filter {
         }
         $params = [];
         $height = $sim['height'];
-        preg_match_all('/([a-z][a-z0-9_]*)=([^\s\]&<"\']+)/i', $m[2], $pairs, PREG_SET_ORDER);
+        preg_match_all('/([a-z][a-z0-9_]*)=([^\s\x{00A0}\]&<"\']+)/iu', $m[2], $pairs, PREG_SET_ORDER);
         foreach ($pairs as [, $key, $value]) {
             $key = strtolower($key);
             if ($key === 'height' && ctype_digit($value)) {

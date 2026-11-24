@@ -73,6 +73,11 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertStringContainsString('pes.html?mode=identify', $out);
     }
 
+    public function test_unicode_nbsp(): void {
+        $out = $this->run_filter("<p>[chemsim\u{00A0}pes\u{00A0}mode=build]</p>");
+        $this->assertStringContainsString('pes.html?mode=build', $out);
+    }
+
     public function test_quotes_cannot_break_out(): void {
         $out = $this->run_filter('[chemsim pes el=Na"onload=alert(1)]');
         $this->assertStringNotContainsString('<iframe', $out);
