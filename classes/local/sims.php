@@ -31,6 +31,7 @@ class sims {
     private const SIMS = [
         'pes' => ['file' => 'pes.html', 'height' => 1150, 'options' => ['mode', 'el', 'compare', 'tabs', 'tour']],
         'equilibrium' => ['file' => 'equilibrium.html', 'height' => 1000, 'options' => ['predict', 'title', 'tour']],
+        'solubility' => ['file' => 'solubility.html', 'height' => 1050, 'options' => ['mode', 'salt', 'predict', 'title', 'tour']],
     ];
 
     /**

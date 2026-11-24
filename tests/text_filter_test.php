@@ -93,6 +93,13 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertMatchesRegularExpression('~<iframe[^>]*src="[^"]*pes\.html\?v=\d+"~', $out);
     }
 
+    public function test_solubility_options(): void {
+        $out = $this->run_filter('[chemsim solubility mode=mix salt=PbI2 colour=red]');
+        $this->assertStringContainsString('solubility.html?mode=mix&amp;salt=PbI2', $out);
+        $this->assertStringNotContainsString('colour', $out);
+        $this->assertStringContainsString('Solubility box', $out);
+    }
+
     public function test_text_without_shortcode_unchanged(): void {
         $text = '<p>No simulations here [chem] at all.</p>';
         $this->assertSame($text, $this->run_filter($text));

@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Solubility Box</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.eq { font-size: 17px; margin: 4px 0 10px; line-height: 1.5; }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: manipulation; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.status { font-size: 15px; line-height: 1.45; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); margin-top: 10px; min-height: 48px; }
+.status.eqm { border-color: #86efac; background: #f0fdf4; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; }
+.why:empty { display: none; }
+.gauge { position: relative; height: 46px; margin: 8px 6px 2px; }
+.gauge .bar { position: absolute; left: 0; right: 0; top: 18px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #dbeafe, #f8fafc 50%, #fee2e2); border: 1px solid #cbd5e1; }
+.gauge .k { position: absolute; top: 8px; width: 3px; height: 30px; background: #111827; margin-left: -1px; left: 50%; }
+.gauge .q { position: absolute; top: 0; margin-left: -9px; width: 18px; text-align: center; font-size: 12px; font-weight: bold; color: var(--accent); }
+.gauge .q::after { content: ""; display: block; margin: 1px auto 0; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 10px solid var(--accent); }
+.gl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); gap: 6px; }
+.rates { display: grid; grid-template-columns: 8.5em 1fr 4.5em; gap: 6px 8px; align-items: center; font-size: 13px; margin-top: 8px; }
+.rates .rb { height: 14px; border-radius: 4px; background: #e2e8f0; position: relative; overflow: hidden; }
+.rates .rb i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+.sq { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 4px; border: 1px solid #64748b; }
+.predict { border: 2px solid var(--accent); background: #eff6ff; border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+.predict p { margin: 0 0 8px; }
+.predict div { display: flex; flex-wrap: wrap; gap: 6px; }
+.fb-ok { color: #166534; } .fb-x { color: #b91c1c; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.readout { font-size: 14px; margin-top: 8px; line-height: 1.5; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.slider { display: grid; grid-template-columns: 9em 1fr 3em; gap: 8px; align-items: center; margin: 6px 0; font-size: 14px; }
+input[type=range] { width: 100%; height: 32px; }
+.mode { display: none; } .mode.active { display: block; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Solubility Box: K<sub>sp</sub></h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="sat">Saturated solution</button>
+  <button data-mode="mix">Will it precipitate?</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+<div class="eq">
+  <label>Salt: <select id="salt"></select></label>
+  &nbsp; <span id="eqn"></span>
+</div>
+
+<div class="row">
+  <div class="card" style="flex:1 1 520px" id="left">
+    <canvas id="box" width="560" height="320" aria-label="Beaker with a solid salt and dissolved ions"></canvas>
+    <div class="legend" id="legend"></div>
+
+    <section class="mode" id="m-sat">
+      <div class="ctl" id="ctl">
+        <b>Solid / water</b>
+        <div><button data-a="solid">Add more solid</button><button data-a="water">Add water</button><button data-a="evap">Evaporate water</button></div>
+        <b>Add a solution</b>
+        <div id="ctl-ions"></div>
+        <b></b>
+        <div><button id="b-pause" class="on">▶ Start</button><button id="b-reset">Start over</button><label class="chk" id="predict-lbl"><input type="checkbox" id="predict"> Predict first</label></div>
+      </div>
+      <div id="pred" class="predict" hidden></div>
+    </section>
+
+    <section class="mode" id="m-mix">
+      <p style="margin:10px 0 4px">Choose how much of each ion is in the beaker <b>right after mixing</b> the two solutions, then predict.</p>
+      <div id="mix-sliders"></div>
+      <div class="readout" id="mix-ksp"></div>
+      <div class="predict" id="mix-pred"></div>
+    </section>
+  </div>
+
+  <div class="card" style="flex:1 1 420px">
+    <h2>Concentrations over time</h2>
+    <canvas id="graph" width="520" height="210" aria-label="Graph of ion concentrations against time"></canvas>
+    <div class="legend" id="glegend"></div>
+    <div id="qk-wrap">
+      <h2 style="margin-top:12px">Q compared with K<sub>sp</sub> &nbsp;<span id="qk" style="font-weight:normal"></span></h2>
+      <div class="gauge"><div class="bar"></div><div class="k"></div><div class="q" id="qpt">Q</div></div>
+      <div class="gl"><span>Q &lt; K<sub>sp</sub>: more can dissolve</span><span>K<sub>sp</sub></span><span>Q &gt; K<sub>sp</sub>: solid forms</span></div>
+    </div>
+    <div class="rates" id="rates">
+      <span>Dissolving rate</span><div class="rb"><i id="rd" style="background:#0d9488"></i></div><span id="rdv"></span>
+      <span>Precipitating rate</span><div class="rb"><i id="rp" style="background:#9333ea"></i></div><span id="rpv"></span>
+    </div>
+    <div class="readout" id="readout"></div>
+    <div class="status" id="status"></div>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note">Concentrations are counted in ions per unit volume, and the K<sub>sp</sub> values are scaled so the ions stay countable (real values, shown in the salt line, are far smaller). The relationships are the real ones: Q is calculated exactly like K<sub>sp</sub>, solid dissolves while Q &lt; K<sub>sp</sub>, and solid forms while Q &gt; K<sub>sp</sub>.</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+// ---------------------------------------------------------------- salts
+// s = molar solubility in this model (formula units dissolved per unit volume of pure water)
+const SALTS = {
+  AgCl: {name: "AgCl", x: 1, y: 1, s: 40, solid0: 80, real: "1.8 × 10⁻¹⁰",
+    cat: {f: "Ag⁺", col: "#94a3b8", r: 5}, an: {f: "Cl⁻", col: "#16a34a", r: 6}, solidCol: "#f8fafc",
+    eqn: "AgCl(s) ⇌ Ag⁺(aq) + Cl⁻(aq)", kexpr: "K<sub>sp</sub> = [Ag⁺][Cl⁻]",
+    adds: [{id: "catsalt", label: "+ AgNO₃ (adds Ag⁺)", ion: "cat", n: 30, spec: "NO₃⁻"}, {id: "ansalt", label: "+ NaCl (adds Cl⁻)", ion: "an", n: 30, spec: "Na⁺"}]},
+  PbI2: {name: "PbI₂", x: 1, y: 2, s: 20, solid0: 60, real: "9.8 × 10⁻⁹",
+    cat: {f: "Pb²⁺", col: "#334155", r: 6}, an: {f: "I⁻", col: "#7c3aed", r: 5}, solidCol: "#facc15",
+    eqn: "PbI₂(s) ⇌ Pb²⁺(aq) + 2 I⁻(aq)", kexpr: "K<sub>sp</sub> = [Pb²⁺][I⁻]²",
+    adds: [{id: "catsalt", label: "+ Pb(NO₃)₂ (adds Pb²⁺)", ion: "cat", n: 15, spec: "NO₃⁻", sp: 2}, {id: "ansalt", label: "+ KI (adds I⁻)", ion: "an", n: 30, spec: "K⁺"}]},
+  MgOH2: {name: "Mg(OH)₂", x: 1, y: 2, s: 20, solid0: 60, real: "5.6 × 10⁻¹²",
+    cat: {f: "Mg²⁺", col: "#0891b2", r: 6}, an: {f: "OH⁻", col: "#dc2626", r: 5}, solidCol: "#f1f5f9",
+    eqn: "Mg(OH)₂(s) ⇌ Mg²⁺(aq) + 2 OH⁻(aq)", kexpr: "K<sub>sp</sub> = [Mg²⁺][OH⁻]²",
+    adds: [{id: "catsalt", label: "+ MgCl₂ (adds Mg²⁺)", ion: "cat", n: 15, spec: "Cl⁻", sp: 2}, {id: "ansalt", label: "+ NaOH (adds OH⁻)", ion: "an", n: 30, spec: "Na⁺"},
+           {id: "acid", label: "+ HCl (acid)", n: 15, spec: "Cl⁻"}]}
+};
+for (const k in SALTS) {
+  const t = SALTS[k];
+  t.ksp = Math.pow(t.x * t.s, t.x) * Math.pow(t.y * t.s, t.y);
+  t.kp = t.s / (2.5 * t.ksp * (t.x + t.y));      // relaxation time about 2.5 s
+  t.kd = t.kp * t.ksp;                             // so that at equilibrium Q = Ksp
+}
+const VOLS = [0.5, 1, 1.5, 2];
+
+// ---------------------------------------------------------------- state
+const S = {mode: "sat", salt: "AgCl", started: false, paused: true, eqm: false, t: 0, vi: 1, nC: 0, nA: 0, nS: 0, nH: 0, spec: 0, specNames: new Set(),
+  diss: 0, parts: [], hist: [], marks: [], pending: null, mixDone: false};
+const SL = () => SALTS[S.salt];
+const V = () => VOLS[S.vi];
+const cC = () => S.nC / V(), cA = () => S.nA / V();
+const Q = () => Math.pow(cC(), SL().x) * Math.pow(cA(), SL().y);
+const dissRate = () => S.nS > 0.01 ? SL().kd * V() : 0;                         // formula units per second
+const precRate = () => { const q = Q(), t = SL(); return S.nS > 0.01 ? t.kp * q * V() : Math.max(0, t.kp * (q - t.ksp) * V()); };
+
+// ---------------------------------------------------------------- geometry and particles
+const CW = 560, CH = 320, BX0 = 70, BX1 = 490, BBOT = 300, HPV = 130;   // water height per unit volume
+const waterTop = () => BBOT - HPV * V();
+let wTopDrawn = BBOT - HPV;
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function spawn(type, x, y) {
+  const a = rnd(0, 6.283), sp = type === "spec" ? 30 : 45;
+  const p = {type, x: x != null ? x : rnd(BX0 + 8, BX1 - 8), y: y != null ? y : rnd(wTopDrawn + 8, pileTop() - 8), vx: sp * Math.cos(a), vy: sp * Math.sin(a), flash: 0};
+  S.parts.push(p); return p;
+}
+const PILE_W = 16, SQ = 10;
+function pileRows() { return Math.ceil(Math.min(S.nS, 160) / PILE_W); }
+function pileTop() { return BBOT - 2 - pileRows() * SQ; }
+const pileX0 = () => (BX0 + BX1) / 2 - PILE_W * SQ / 2;
+function count(type) { let k = 0; for (const p of S.parts) if (p.type === type) k++; return k; }
+function nearestToPile(type) {
+  let best = null, bd = 1e9; const px = (BX0 + BX1) / 2, py = pileTop();
+  for (const p of S.parts) if (p.type === type) { const d = (p.x - px) ** 2 + (p.y - py) ** 2; if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+function removeP(p) { S.parts.splice(S.parts.indexOf(p), 1); }
+function sparkle(x, y) { S.parts.push({type: "fx", x, y, vx: 0, vy: 0, flash: 1}); }
+function dissolveVisual() {   // one formula unit leaves the pile
+  const t = SL(), x = rnd(pileX0(), pileX0() + PILE_W * SQ), y = pileTop() - 4;
+  for (let i = 0; i < t.x; i++) spawn("cat", x + rnd(-6, 6), y - rnd(0, 6)).flash = 1;
+  for (let i = 0; i < t.y; i++) spawn("an", x + rnd(-6, 6), y - rnd(0, 6)).flash = 1;
+}
+function precipVisual() {     // one formula unit joins the pile
+  const t = SL(); let sx = 0, sy = 0, k = 0;
+  for (const [type, n] of [["cat", t.x], ["an", t.y]]) for (let i = 0; i < n; i++) { const p = nearestToPile(type); if (p) { sx += p.x; sy += p.y; k++; removeP(p); } }
+  if (k) sparkle(sx / k, sy / k);
+}
+function syncParticles() {
+  const want = {cat: Math.round(S.nC), an: Math.round(S.nA), H: Math.round(S.nH), spec: Math.min(40, Math.round(S.spec))};
+  for (const type in want) {
+    let have = count(type);
+    while (have < want[type]) { spawn(type, null, wTopDrawn + rnd(4, 30)); have++; }
+    while (have > want[type]) { const p = type === "cat" || type === "an" ? nearestToPile(type) : S.parts.find(q => q.type === type); removeP(p); have--; }
+  }
+}
+function poisson(l) { let k = 0, p = Math.exp(-l), s = p, u = Math.random(); while (u > s && k < 50) { k++; p *= l / k; s += p; } return k; }
+
+// ---------------------------------------------------------------- simulation step
+function step(dt) {
+  S.t += dt;
+  const t = SL(), sub = 4, h = dt / sub;
+  for (let i = 0; i < sub; i++) {
+    let d = (dissRate() - precRate()) * h;                          // formula units dissolved (negative: precipitated)
+    d = Math.min(d, S.nS);
+    d = Math.max(d, -Math.min(S.nC / t.x, S.nA / t.y));
+    S.nS -= d; S.nC += t.x * d; S.nA += t.y * d; S.diss += d;
+    if (S.nS < 1e-6) S.nS = 0;
+    if (S.salt === "MgOH2" && S.nH > 0 && S.nA > 0) { const r = Math.min(S.nH, S.nA); S.nH -= r; S.nA -= r; }   // H₃O⁺ + OH⁻ → 2 H₂O (fast)
+  }
+  // pictures follow the amounts: net change as dissolving / joining the pile...
+  const tC = Math.round(S.nC);
+  let vC = count("cat"), guard = 0;
+  while (vC < tC && guard++ < 50) { dissolveVisual(); vC += t.x; }
+  while (vC > tC + t.x - 1 && guard++ < 100) { precipVisual(); vC -= t.x; }
+  // ...plus the dissolving and precipitating that cancel out at saturation
+  let nx = poisson(Math.min(dissRate(), precRate(), 8) * dt);
+  while (nx-- > 0 && S.nS > 1) { precipVisual(); dissolveVisual(); }
+  syncParticles();
+  // motion
+  wTopDrawn += (waterTop() - wTopDrawn) * Math.min(1, dt * 4);
+  const y0 = wTopDrawn + 6, x0 = BX0 + 6, x1 = BX1 - 6;
+  for (const p of S.parts) {
+    p.flash = Math.max(0, p.flash - dt * 2);
+    if (p.type === "fx") continue;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    const yb = (p.x > pileX0() - 4 && p.x < pileX0() + PILE_W * SQ + 4 ? pileTop() : BBOT) - 6;
+    if (p.x < x0) { p.x = x0; p.vx = Math.abs(p.vx); }
+    if (p.x > x1) { p.x = x1; p.vx = -Math.abs(p.vx); }
+    if (p.y < y0) { p.y = y0; p.vy = Math.abs(p.vy); }
+    if (p.y > yb) { p.y = yb; p.vy = -Math.abs(p.vy); }
+  }
+  S.parts = S.parts.filter(p => p.type !== "fx" || p.flash > 0);
+  S.sampleT = (S.sampleT || 0) + dt;
+  if (S.sampleT >= 0.25) { S.sampleT = 0; S.hist.push({t: S.t, c: cC(), a: cA()}); while (S.hist.length && S.hist[0].t < S.t - 90) S.hist.shift(); }
+  if (S.pending && S.t >= S.pending.at) { S.pending.done(); S.pending = null; }
+}
+
+// ---------------------------------------------------------------- drawing
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, CW, CH); hiDPI(graph, 520, 210);
+function drawBox() {
+  const g = bg, t = SL(); g.clearRect(0, 0, CW, CH);
+  // water
+  g.fillStyle = "#e0f2fe"; g.fillRect(BX0, wTopDrawn, BX1 - BX0, BBOT - wTopDrawn);
+  g.strokeStyle = "#7dd3fc"; g.lineWidth = 2; g.beginPath(); g.moveTo(BX0, wTopDrawn); g.lineTo(BX1, wTopDrawn); g.stroke();
+  // volume marks
+  g.fillStyle = "#64748b"; g.font = "11px Arial"; g.textAlign = "right";
+  for (const v of VOLS) { const y = BBOT - HPV * v; g.fillRect(BX0 - 8, y, 8, 1.5); g.fillText(v.toFixed(1), BX0 - 11, y + 4); }
+  g.save(); g.translate(22, BBOT - 120); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.fillText("volume", 0, 0); g.restore();
+  // pile
+  const nShow = Math.min(Math.round(S.nS), 160);
+  for (let i = 0; i < nShow; i++) {
+    const row = Math.floor(i / PILE_W), col = i % PILE_W;
+    const x = pileX0() + col * SQ + (row % 2 ? SQ / 2 : 0), y = BBOT - 2 - (row + 1) * SQ;
+    g.fillStyle = t.solidCol; g.fillRect(x, y, SQ - 1, SQ - 1); g.strokeStyle = "#94a3b8"; g.lineWidth = 1; g.strokeRect(x + .5, y + .5, SQ - 2, SQ - 2);
+  }
+  if (S.nS > 160) { g.fillStyle = "#334155"; g.textAlign = "center"; g.fillText(`+${Math.round(S.nS - 160)} more`, (BX0 + BX1) / 2, pileTop() - 4); }
+  // ions
+  for (const p of S.parts) {
+    if (p.flash > 0) { g.beginPath(); g.arc(p.x, p.y, 9 + 7 * (1 - p.flash), 0, 6.283); g.strokeStyle = `rgba(250,204,21,${p.flash})`; g.lineWidth = 2; g.stroke(); }
+    if (p.type === "fx") continue;
+    const sty = p.type === "cat" ? t.cat : p.type === "an" ? t.an : p.type === "H" ? {col: "#2563eb", r: 3.5} : {col: "#cbd5e1", r: 3};
+    g.beginPath(); g.arc(p.x, p.y, sty.r, 0, 6.283); g.fillStyle = sty.col; g.fill();
+  }
+  // beaker
+  g.strokeStyle = "#475569"; g.lineWidth = 3; g.beginPath(); g.moveTo(BX0 - 2, 22); g.lineTo(BX0 - 2, BBOT + 2); g.lineTo(BX1 + 2, BBOT + 2); g.lineTo(BX1 + 2, 22); g.stroke();
+  g.textAlign = "left"; g.fillStyle = "#475569"; g.font = "13px Arial";
+  g.fillText(`V = ${V()}   ·   solid: ${S.nS >= 1 ? Math.round(S.nS) + " units" : "none left"}`, BX0, 16);
+  if (S.mode === "sat" && !S.started) {
+    const cx = (BX0 + BX1) / 2, cy = 120;
+    g.fillStyle = "rgba(255,255,255,.92)"; g.strokeStyle = "#1d4ed8"; g.lineWidth = 2;
+    g.beginPath(); g.roundRect(cx - 105, cy - 24, 210, 48, 10); g.fill(); g.stroke();
+    g.fillStyle = "#1d4ed8"; g.font = "bold 17px Arial"; g.textAlign = "center"; g.fillText("▶ Press Start", cx, cy + 6); g.textAlign = "left";
+  } else if (S.mode === "sat" && S.paused) { g.fillStyle = "rgba(15,23,42,.6)"; g.font = "bold 15px Arial"; g.fillText("Paused", BX0 + 8, 40); }
+}
+function niceMax(v) { for (const s of [10, 20, 30, 40, 50, 60, 80, 100, 120, 150, 200, 250, 300]) if (v <= s) return s; return Math.ceil(v / 100) * 100; }
+function drawGraph() {
+  const g = gg, W = 520, H = 210, L = 44, R = 10, Tp = 10, Bt = 28, t = SL();
+  g.clearRect(0, 0, W, H);
+  const span = 60, tEnd = Math.max(S.t, span), t0 = tEnd - span, pts = S.hist.filter(h => h.t >= t0 - 1);
+  const ymax = niceMax(Math.max(10, ...pts.map(h => Math.max(h.c, h.a))) * 1.1);
+  const X = tt => L + (tt - t0) / span * (W - L - R), Y = c => H - Bt - c / ymax * (H - Bt - Tp);
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let i = 0; i <= 4; i++) { const c = ymax * i / 4, y = Y(c); g.beginPath(); g.moveTo(L, y); g.lineTo(W - R, y); g.stroke(); g.fillText(Math.round(c), L - 5, y + 4); }
+  g.textAlign = "center"; g.fillText("time (s) →", (L + W - R) / 2, H - 6);
+  for (let s = Math.ceil(t0 / 10) * 10; s <= tEnd; s += 10) g.fillText(Math.round(s), X(s), H - Bt + 14);
+  for (const m of S.marks) if (m.t >= t0) {
+    const x = X(m.t); g.strokeStyle = "#94a3b8"; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(x, Tp); g.lineTo(x, H - Bt); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "#334155"; g.textAlign = "left"; g.font = "bold 11px Arial"; g.fillText(m.label, x + 3, Tp + 10 + (m.row || 0) * 12);
+  }
+  for (const [key, col] of [["c", t.cat.col], ["a", t.an.col]]) {
+    g.strokeStyle = col; g.lineWidth = 2.2; g.beginPath();
+    pts.forEach((h, i) => { const x = X(h.t), y = Y(h[key]); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+  }
+  g.strokeStyle = "#1f2937"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(L, Tp); g.lineTo(L, H - Bt); g.lineTo(W - R, H - Bt); g.stroke();
+}
+let rmax = 1;
+const fmtN = v => v >= 100 ? Math.round(v).toLocaleString("en-US") : v >= 10 ? v.toFixed(1) : v.toFixed(2);
+function drawPanel() {
+  const t = SL(), q = Q(), lr = q > 0 ? Math.log10(q / t.ksp) : -9;
+  $("qk").innerHTML = `Q = ${q < 0.5 ? "0" : fmtN(q)}, K<sub>sp</sub> = ${fmtN(t.ksp)}`;
+  $("qpt").style.left = (50 + Math.max(-1, Math.min(1, lr)) * 48) + "%";
+  const d = dissRate(), p = precRate(); rmax = Math.max(rmax * 0.995, d, p, 0.5);
+  $("rd").style.width = (d / rmax * 100).toFixed(1) + "%"; $("rp").style.width = (p / rmax * 100).toFixed(1) + "%";
+  $("rdv").textContent = d.toFixed(1) + " /s"; $("rpv").textContent = p.toFixed(1) + " /s";
+  const sol = S.diss / V();
+  $("readout").innerHTML = `[${t.cat.f}] = ${fmtN(cC())}, &nbsp;[${t.an.f}] = ${fmtN(cA())}` +
+    (S.mode === "sat" ? ` &nbsp;·&nbsp; dissolved from the solid: <b>${fmtN(Math.max(0, sol))}</b> per unit volume (the molar solubility, s, in pure water: ${t.s})` : "") +
+    (S.nH >= 0.5 ? ` &nbsp;·&nbsp; leftover H₃O⁺: ${Math.round(S.nH)}` : "");
+  let msg, eqm = false;
+  S.eqm = S.eqm ? Math.abs(lr) < 0.03 : Math.abs(lr) < 0.015;
+  if (S.mode === "sat" && !S.started) msg = "<b>Not started:</b> pure water and a pile of solid. Q = 0, so Q &lt; K<sub>sp</sub>: when you press <b>Start</b>, the solid will begin to dissolve.";
+  else if (S.mode === "mix" && !S.mixDone) msg = "Set the concentrations, decide whether a precipitate will form, then press your prediction.";
+  else if (S.eqm && S.nS > 0.5) { eqm = true; msg = "<b>Saturated:</b> Q = K<sub>sp</sub>. Ions are still dissolving and joining the solid (watch the flashes), at the same rate, so nothing changes overall: a <b>dynamic equilibrium</b> with solid present."; }
+  else if (lr < 0 && S.nS < 0.5) msg = "<b>Unsaturated:</b> Q &lt; K<sub>sp</sub> and there is no solid left to dissolve. If you added more solid now, some of it would dissolve.";
+  else if (lr < 0) msg = "<b>Q &lt; K<sub>sp</sub>:</b> dissolving is faster than precipitating, so the solid is <b>dissolving</b> and the ion concentrations are rising.";
+  else if (S.eqm) { eqm = true; msg = "<b>Q = K<sub>sp</sub>:</b> the solution is exactly saturated."; }
+  else msg = "<b>Q &gt; K<sub>sp</sub>:</b> the solution holds more ions than it can at equilibrium, so ions are joining together as <b>solid (a precipitate)</b> until Q falls back to K<sub>sp</sub>.";
+  $("status").innerHTML = msg; $("status").classList.toggle("eqm", eqm);
+}
+
+// ---------------------------------------------------------------- saturated-solution actions
+const DIRS = {dissolve: "more solid dissolves", none: "no change", precip: "some solid precipitates"};
+function act(key) {
+  const t = SL(), add = t.adds.find(a => a.id === key);
+  if (key === "solid") return {label: "+solid", ok: true, dir: S.nS < 0.5 && Q() < t.ksp * 0.97 ? "dissolve" : "none", run: () => { S.nS += 20; },
+    why: S.nS < 0.5 && Q() < t.ksp * 0.97
+      ? "The solution was unsaturated (Q &lt; K<sub>sp</sub>), so some of the new solid <b>dissolves</b> until Q reaches K<sub>sp</sub> (or the solid runs out)."
+      : "The solution is already saturated. Adding solid does <b>not</b> change [ions]: the solid does not appear in the K<sub>sp</sub> expression, so Q still equals K<sub>sp</sub>. The extra solid just sits there (it still swaps ions with the solution, but no net change)."};
+  if (key === "water") return {label: "+water", ok: S.vi < VOLS.length - 1, dir: S.nS > 0.5 ? "dissolve" : "none", run: () => { S.vi++; },
+    why: S.nS > 0.5
+      ? "Adding water dilutes the ions, so Q drops below K<sub>sp</sub>. More solid <b>dissolves</b> until the concentrations are back to the same saturated values: more water holds more dissolved salt, but at the <b>same concentration</b>."
+      : "There is no solid left, so nothing more can dissolve: the ions just become more dilute and the solution stays unsaturated."};
+  if (key === "evap") return {label: "−water", ok: S.vi > 0, dir: Q() * Math.pow(VOLS[S.vi] / VOLS[Math.max(0, S.vi - 1)], t.x + t.y) > t.ksp * 1.03 ? "precip" : "none", run: () => { S.vi--; },
+    why: "Evaporating water concentrates the ions, so Q rises. If Q goes above K<sub>sp</sub>, ions join together as <b>solid</b> until Q = K<sub>sp</sub> again. The concentrations end up the same as before; there is just less water holding them."};
+  if (key === "acid") return {label: "+acid", ok: true, dir: S.nS > 0.5 ? "dissolve" : "none", run: () => { S.nH += add.n; S.spec += add.n; S.specNames.add(add.spec); },
+    why: "H₃O⁺ from the acid reacts with OH⁻ (H₃O⁺ + OH⁻ → 2 H₂O), removing OH⁻ from the solution. That makes Q &lt; K<sub>sp</sub>, so more Mg(OH)₂ <b>dissolves</b>. This is why salts with a basic anion (OH⁻, F⁻, CO₃²⁻ …) are <b>more soluble in acid</b>. With enough acid, all the solid dissolves."};
+  if (add) {
+    const qNew = Math.pow(cC() + (add.ion === "cat" ? add.n / V() : 0), t.x) * Math.pow(cA() + (add.ion === "an" ? add.n / V() : 0), t.y);
+    return {label: add.ion === "cat" ? "+" + t.cat.f : "+" + t.an.f, ok: true, dir: qNew > t.ksp * 1.03 ? "precip" : "none",
+    run: () => { if (add.ion === "cat") S.nC += add.n; else S.nA += add.n; S.spec += add.n * (add.sp || 1); S.specNames.add(add.spec); },
+    why: `This is the <b>common-ion effect</b>. Adding ${add.ion === "cat" ? t.cat.f : t.an.f} raises Q above K<sub>sp</sub>, so ions join together as <b>solid</b> until Q = K<sub>sp</sub> again. Afterwards [${add.ion === "cat" ? t.an.f : t.cat.f}] is lower than before: <b>less ${t.name} is dissolved</b>. A salt is less soluble in a solution that already contains one of its ions. (The ${add.spec} ions are spectators: they are not in the K<sub>sp</sub> expression.)`};
+  }
+}
+function mark(label) { const recent = S.marks.filter(m => m.t > S.t - 8).length; S.marks.push({t: S.t, label, row: recent % 3}); }
+function doAct(a) { a.run(); syncParticles(); mark(a.label); $("why").innerHTML = a.why; updateButtons(); }
+function request(key) {
+  if (S.pending || !$("pred").hidden) return;
+  const a = act(key); if (!a.ok) return;
+  if (!$("predict").checked) { doAct(a); if (!S.started) run(true); return; }
+  const what = {solid: "add more solid", water: "add water", evap: "evaporate some water", acid: "add acid (HCl)"}[key] || `add ${SL().adds.find(x => x.id === key).label.replace("+ ", "")}`;
+  const p = $("pred"); p.hidden = false; run(false);
+  p.innerHTML = `<p><b>Predict:</b> you are about to ${what}. What will happen?</p><div>
+    <button data-p="dissolve">More solid dissolves</button><button data-p="none">No change</button><button data-p="precip">Some solid precipitates</button></div>`;
+  p.onclick = ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    const ok = b.dataset.p === a.dir;
+    p.innerHTML = `<p class="${ok ? "fb-ok" : "fb-x"}"><b>${ok ? "Correct" : "Not quite"}: ${DIRS[a.dir]}.</b> ${ok ? "" : `You said ${DIRS[b.dataset.p]}.`} Now watch it happen.</p>`;
+    doAct(a); run(true);
+    S.pending = {at: S.t + 6, done: () => { p.hidden = true; }};
+  };
+}
+function updateButtons() {
+  for (const b of document.querySelectorAll("#ctl button[data-a]")) b.disabled = !act(b.dataset.a).ok;
+}
+function run(on) {
+  S.paused = !on; if (on) S.started = true;
+  $("b-pause").textContent = on ? "❚❚ Pause" : "▶ Run"; $("b-pause").classList.toggle("on", !on);
+}
+
+// ---------------------------------------------------------------- precipitation (mixing) mode
+const mix = {c: 20, a: 20};
+function mixSetup() {
+  const t = SL(), maxC = t.x * t.s * 2.5, maxA = t.y * t.s * 2.5;
+  mix.c = Math.round(maxC * 0.3); mix.a = Math.round(maxA * 0.3);
+  $("mix-sliders").innerHTML = `
+    <div class="slider"><span>[${t.cat.f}] after mixing</span><input type="range" id="mx-c" min="0" max="${maxC}" step="1" value="${mix.c}"><b id="mx-cv">${mix.c}</b></div>
+    <div class="slider"><span>[${t.an.f}] after mixing</span><input type="range" id="mx-a" min="0" max="${maxA}" step="1" value="${mix.a}"><b id="mx-av">${mix.a}</b></div>
+    <div class="note" style="margin-top:0">${t.cat.f} comes from a soluble salt (${t.adds[0].label.replace(/^\+ | \(.*$/g, "")}) and ${t.an.f} from another (${t.adds[1].label.replace(/^\+ | \(.*$/g, "")}).</div>`;
+  $("mx-c").oninput = e => { mix.c = +e.target.value; $("mx-cv").textContent = mix.c; mixReset(); };
+  $("mx-a").oninput = e => { mix.a = +e.target.value; $("mx-av").textContent = mix.a; mixReset(); };
+  mixReset();
+}
+function mixReset() {
+  const t = SL();
+  Object.assign(S, {started: true, paused: true, t: 0, vi: 1, nC: 0, nA: 0, nS: 0, nH: 0, spec: 0, diss: 0, parts: [], hist: [], marks: [], pending: null, mixDone: false});
+  S.specNames = new Set(); wTopDrawn = waterTop();
+  $("mix-ksp").innerHTML = `${t.kexpr} = <b>${fmtN(t.ksp)}</b> (scaled for this model). Work out Q for the mixture and compare it with K<sub>sp</sub>.`;
+  $("mix-pred").innerHTML = `<p><b>Predict:</b> when these solutions are mixed, will a precipitate of ${t.name} form?</p><div>
+    <button data-m="yes">Yes, a precipitate forms</button><button data-m="no">No, it stays dissolved</button></div>`;
+  $("why").innerHTML = "";
+  legend();
+}
+$("mix-pred").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-m]"); if (!b || S.mixDone) return;
+  const t = SL();
+  S.nC = mix.c; S.nA = mix.a; S.spec = mix.c + mix.a; syncParticles();
+  const q = Q(), yes = q > t.ksp, ok = (b.dataset.m === "yes") === yes;
+  const qcalc = t.y === 1 ? `${mix.c} × ${mix.a}` : `${mix.c} × ${mix.a}²`;
+  S.mixDone = true; S.paused = false; mark("mixed");
+  $("mix-pred").innerHTML = `<p class="${ok ? "fb-ok" : "fb-x"}"><b>${ok ? "Correct" : "Not quite"}: ${yes ? "a precipitate forms" : "no precipitate"}.</b></p>
+    <p>Q = ${qcalc} = <b>${fmtN(q)}</b>, which is ${yes ? "greater" : q === t.ksp ? "equal to" : "less"} than K<sub>sp</sub> = ${fmtN(t.ksp)}.
+    ${yes ? "Ions join together as solid until Q falls to K<sub>sp</sub>. Watch the pile form." : q === 0 ? "With one of the ions missing, nothing can precipitate." : "The solution is unsaturated, so everything stays dissolved."}</p>
+    <div><button data-again="1" class="primary">Try other amounts</button></div>`;
+});
+$("mix-pred").addEventListener("click", ev => { if (ev.target.closest("button[data-again]")) mixReset(); });
+
+// ---------------------------------------------------------------- setup
+function legend() {
+  const t = SL();
+  $("legend").innerHTML = `<span><span class="dot" style="background:${t.cat.col}"></span>${t.cat.f}</span><span><span class="dot" style="background:${t.an.col}"></span>${t.an.f}</span>` +
+    `<span><span class="sq" style="background:${t.solidCol}"></span>solid ${t.name}</span>` +
+    (S.salt === "MgOH2" ? `<span><span class="dot" style="background:#2563eb"></span>H₃O⁺</span>` : "") +
+    `<span><span class="dot" style="background:#cbd5e1"></span>spectator ions</span>`;
+  $("glegend").innerHTML = `<span><span class="dot" style="background:${t.cat.col}"></span>[${t.cat.f}]</span><span><span class="dot" style="background:${t.an.col}"></span>[${t.an.f}]</span><span>(ions per unit volume)</span>`;
+  $("eqn").innerHTML = `${t.eqn} &nbsp; · &nbsp; ${t.kexpr} &nbsp; <span style="color:var(--muted);font-size:14px">(real value at 25 °C ≈ ${t.real})</span>`;
+}
+function satReset() {
+  const t = SL();
+  Object.assign(S, {started: false, paused: true, eqm: false, t: 0, vi: 1, nC: 0, nA: 0, nS: t.solid0, nH: 0, spec: 0, diss: 0, parts: [], hist: [], marks: [], pending: null});
+  S.specNames = new Set(); wTopDrawn = waterTop();
+  $("ctl-ions").innerHTML = t.adds.map(a => `<button data-a="${a.id}">${a.label}</button>`).join("");
+  for (const b of document.querySelectorAll("#ctl button[data-a]")) b.onclick = () => request(b.dataset.a);
+  $("pred").hidden = true; $("b-pause").textContent = "▶ Start"; $("b-pause").classList.add("on");
+  $("why").innerHTML = `Pure water with a pile of solid ${t.name}. Press <b>▶ Start</b> and watch it dissolve until the solution is saturated, then change something.`;
+  mark("start"); legend(); updateButtons();
+}
+function setMode(m) {
+  S.mode = m;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  $("rates").style.display = m === "mix" ? "none" : "";
+  if (m === "sat") satReset(); else mixSetup();
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+$("salt").innerHTML = Object.keys(SALTS).map(k => `<option value="${k}">${SALTS[k].name}</option>`).join("");
+$("salt").onchange = () => { S.salt = $("salt").value; setMode(S.mode); };
+$("b-pause").onclick = () => { if (!$("pred").hidden && S.paused) return; run(S.paused); };
+$("b-reset").onclick = satReset;
+box.addEventListener("click", () => { if (S.mode === "sat" && !S.started && $("pred").hidden) run(true); });
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+
+// ---------------------------------------------------------------- first-visit tours
+const TOURS = {
+  sat: [
+    ["#salt", "Choose a salt. The equation and the K<sub>sp</sub> expression for it appear next to it."],
+    ["#box", "The beaker: a pile of solid at the bottom and water above it. Dissolved ions move around in the water. Each yellow flash is an ion leaving the solid or joining it."],
+    ["#graph", "The ion concentrations over time. Every change you make is marked with a dashed line."],
+    ["#qk-wrap", "<b>Q compared with K<sub>sp</sub>.</b> Q is calculated just like K<sub>sp</sub>, from the concentrations right now. On the K<sub>sp</sub> line, the solution is saturated."],
+    ["#rates", "How fast the solid is dissolving and how fast ions are joining it. In a saturated solution they are equal."],
+    ["#ctl", "Press <b>▶ Start</b>. When the solution is saturated, change something: add solid, add or evaporate water, or add a solution that contains one of the ions."],
+    ["#status", "This line tells you what is happening right now, and the reason for each change appears just below it."]
+  ],
+  mix: [
+    ["#mix-sliders", "Set the concentration of each ion in the beaker right after the two solutions are mixed."],
+    ["#mix-ksp", "Use K<sub>sp</sub>: calculate Q for your mixture and compare. If Q &gt; K<sub>sp</sub>, a precipitate forms."],
+    ["#mix-pred", "Make your prediction. Then watch the beaker, and the graph, to see if you were right."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-ksp-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {sat: "Saturated solution", mix: "Will it precipitate?"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
+// ---------------------------------------------------------------- run
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!S.paused) step(dt);
+  drawBox(); drawGraph(); drawPanel();
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("predict") === "1") $("predict").checked = true;
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const salt = q.get("salt"); if (salt && SALTS[salt]) { S.salt = salt; $("salt").value = salt; }
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "mix" ? "mix" : "sat");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+</body>
+</html>
