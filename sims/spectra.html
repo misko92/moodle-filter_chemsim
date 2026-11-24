@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Line Spectra</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+.ctl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ctl button.n { min-width: 46px; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 15px; line-height: 1.6; margin-top: 8px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.ok { color: #047857; } .bad { color: #b91c1c; }
+.mode { display: none; } .mode.active { display: block; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Line Spectra and Energy Levels</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="hydrogen">Hydrogen atom</button>
+  <button data-mode="elements">Identify the gas</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 460px" id="boxcard">
+    <section class="mode" id="m-hydrogen">
+      <canvas id="levels" width="520" height="380" aria-label="Energy levels of the hydrogen atom with the electron; tap a level to move the electron there"></canvas>
+      <div class="ctl" id="ctl">
+        <b>Move the electron to</b>
+        <div id="nbtns"></div>
+        <b>Discharge tube</b>
+        <div><button id="b-auto" class="primary">⚡ Turn on</button><button id="b-clear">Clear spectrum</button></div>
+        <b>Spectrum</b>
+        <div><button id="b-em" class="on">Emission</button><button id="b-ab">Absorption</button></div>
+      </div>
+    </section>
+    <section class="mode" id="m-elements">
+      <canvas id="tube" width="520" height="220" aria-label="Glowing gas discharge tube"></canvas>
+      <div class="ctl" id="ectl">
+        <b>Look at</b>
+        <div><select id="el"></select><button id="b-myst" class="primary">🧪 Mystery tube</button></div>
+        <b class="mq">Which gases are in it?</b>
+        <div class="mq" id="mq"></div>
+        <b class="mq"></b>
+        <div class="mq"><button id="b-check" class="primary">Check</button></div>
+      </div>
+      <div class="why" id="mfb" style="display:none"></div>
+    </section>
+  </div>
+
+  <div class="card" style="flex:1 1 500px" id="graphcard">
+    <h2 id="gtitle"></h2>
+    <canvas id="spec" width="520" height="230" aria-label="Spectrum"></canvas>
+    <div class="big" id="calc"></div>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note" id="foot"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const RH = 2.178e-18, H = 6.626e-34, C = 2.998e8;
+const En = n => -RH / (n * n);                       // J
+const lam = (ni, nf) => H * C / Math.abs(En(ni) - En(nf)) * 1e9;   // nm
+const SERIES = {1: ["Lyman", "ultraviolet"], 2: ["Balmer", "visible"], 3: ["Paschen", "infrared"], 4: ["Brackett", "infrared"], 5: ["Pfund", "infrared"]};
+function rgbOf(l) {
+  if (l < 380 || l > 750) return null;
+  let r = 0, g = 0, b = 0;
+  if (l < 440) { r = (440 - l) / 60; b = 1; } else if (l < 490) { g = (l - 440) / 50; b = 1; } else if (l < 510) { g = 1; b = (510 - l) / 20; }
+  else if (l < 580) { r = (l - 510) / 70; g = 1; } else if (l < 645) { r = 1; g = (645 - l) / 65; } else r = 1;
+  const f = l < 420 ? 0.3 + 0.7 * (l - 380) / 40 : l > 700 ? 0.3 + 0.7 * (750 - l) / 50 : 1;
+  return [Math.round(255 * r * f), Math.round(255 * g * f), Math.round(255 * b * f)];
+}
+function colourName(l) { return l < 380 ? "ultraviolet (invisible)" : l < 450 ? "violet" : l < 495 ? "blue" : l < 570 ? "green" : l < 590 ? "yellow" : l < 620 ? "orange" : l <= 750 ? "red" : "infrared (invisible)"; }
+function sci(v, d = 3) { const e = Math.floor(Math.log10(Math.abs(v))), m = v / Math.pow(10, e); return `${m.toFixed(d - 1)}×10<sup>${e}</sup>`; }
+
+// ---------------------------------------------------------------- hydrogen tab
+const NMAX = 6;
+const S = {mode: "hydrogen", n: 1, lines: {}, auto: false, absorb: false, ph: [], arrows: [], last: null, tAuto: 0, el: "H", myst: null};
+const LV = {x0: 70, x1: 330};
+const yOf = n => 350 - (En(n) / RH + 1) * 300;   // n = Infinity -> top
+const levels = $("levels"), lg = levels.getContext("2d"), spec = $("spec"), sg = spec.getContext("2d"), tube = $("tube"), tg = tube.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(levels, 520, 380); hiDPI(spec, 520, 230); hiDPI(tube, 520, 220);
+function transition(nf, manual) {
+  const ni = S.n; if (nf === ni) return;
+  const l = lam(ni, nf), dE = En(nf) - En(ni), down = nf < ni;
+  S.arrows.push({ni, nf, t: 1});
+  if (down) { S.ph.push({y: (yOf(ni) + yOf(nf)) / 2, x: LV.x1 - 30, l, out: true}); const k = `${ni}-${nf}`; S.lines[k] = (S.lines[k] || 0) + 1; }
+  else S.ph.push({y: (yOf(ni) + yOf(nf)) / 2, x: 520, l, out: false});
+  if (S.absorb && !down) { const k = `${nf}-${ni}`; S.lines[k] = (S.lines[k] || 0) + 1; }
+  S.n = nf; S.last = {ni, nf, l, dE};
+  if (manual) calcText();
+}
+function stepH(dt) {
+  if (S.auto) {
+    S.tAuto -= dt;
+    if (S.tAuto <= 0) {
+      S.tAuto = 0.35;
+      if (S.n === 1 || (S.absorb && S.n < NMAX && Math.random() < 0.5)) transition(S.n + 1 + Math.floor(Math.random() * (NMAX - S.n)), false);   // excited by a collision (or by absorbing light)
+      else transition(1 + Math.floor(Math.random() * (S.n - 1)), false);                                                                       // falls to any lower level
+      calcText();
+    }
+  }
+  for (const p of S.ph) p.x += (p.out ? 1 : -1) * 220 * dt;
+  S.ph = S.ph.filter(p => p.x > LV.x1 - 40 && p.x < 540 && !(!p.out && p.x < LV.x1 - 20));
+  for (const a of S.arrows) a.t -= dt * 0.6; S.arrows = S.arrows.filter(a => a.t > 0);
+}
+function phColour(l) { const c = rgbOf(l); return c ? `rgb(${c})` : l < 380 ? "#7c3aed" : "#7f1d1d"; }
+function drawLevels() {
+  const g = lg; g.clearRect(0, 0, 520, 380);
+  g.fillStyle = "#1f2937"; g.font = "bold 12px Arial"; g.textAlign = "left"; g.fillText("Energy", 6, 20);
+  g.strokeStyle = "#94a3b8"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(30, 350); g.lineTo(30, 30); g.stroke(); g.beginPath(); g.moveTo(30, 30); g.lineTo(25, 40); g.lineTo(35, 40); g.closePath(); g.fillStyle = "#94a3b8"; g.fill();
+  g.setLineDash([4, 4]); g.beginPath(); g.moveTo(LV.x0, yOf(Infinity)); g.lineTo(LV.x1, yOf(Infinity)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.fillText("n = ∞ (ionized), E = 0", LV.x1 + 6, yOf(Infinity) - 2);
+  for (let n = 1; n <= NMAX; n++) {
+    const y = yOf(n); g.strokeStyle = n === S.n ? "#1d4ed8" : "#334155"; g.lineWidth = n === S.n ? 3 : 2; g.beginPath(); g.moveTo(LV.x0, y); g.lineTo(LV.x1, y); g.stroke();
+    g.fillStyle = "#1f2937"; g.font = "bold 12px Arial"; if (n <= 3) g.fillText(`n = ${n}`, 36, y + 4); else if (n === 4) g.fillText("n = 4, 5, 6", 36, yOf(NMAX) - 7);
+    if (n <= 3) { g.font = "11px Arial"; g.fillStyle = "#6b7280"; g.fillText(`${En(n).toExponential(2).replace("e", "E").replace("-", "−")} J`, LV.x1 + 6, y + 4 + 0); }
+  }
+  for (const a of S.arrows) {
+    const x = LV.x0 + 60 + ((a.ni * 7 + a.nf * 13) % 6) * 30, y1 = yOf(a.ni), y2 = yOf(a.nf), up = a.nf > a.ni;
+    g.strokeStyle = up ? `rgba(220,38,38,${a.t})` : `rgba(5,150,105,${a.t})`; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x, y1); g.lineTo(x, y2); g.stroke();
+    g.beginPath(); g.moveTo(x, y2); g.lineTo(x - 5, y2 + (up ? 9 : -9)); g.lineTo(x + 5, y2 + (up ? 9 : -9)); g.closePath(); g.fillStyle = g.strokeStyle; g.fill();
+  }
+  // electron
+  const ey = yOf(S.n); g.beginPath(); g.arc(LV.x0 + 30, ey, 7, 0, 6.283); g.fillStyle = "#facc15"; g.fill(); g.strokeStyle = "#a16207"; g.lineWidth = 1.5; g.stroke();
+  g.fillStyle = "#713f12"; g.font = "bold 9px Arial"; g.textAlign = "center"; g.fillText("e⁻", LV.x0 + 30, ey + 3);
+  // photons as little wave packets
+  for (const p of S.ph) {
+    g.strokeStyle = phColour(p.l); g.lineWidth = 2.5; g.beginPath();
+    const wl = Math.max(6, Math.min(28, p.l / 30));
+    for (let k = 0; k <= 40; k++) { const x = p.x + k - 20, y = p.y + 6 * Math.sin((x - p.x) / wl * 6.283) * Math.exp(-(((k - 20) / 12) ** 2)); k ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke(); g.fillStyle = "#334155"; g.font = "10px Arial"; g.fillText(`${Math.round(p.l)} nm`, p.x, p.y - 10);
+  }
+  g.textAlign = "left"; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.fillText("tap a level to move the electron", LV.x0, 372);
+}
+// spectrum strips
+function drawSpectrumH() {
+  const g = sg; g.clearRect(0, 0, 520, 230);
+  const X0 = 20, X1 = 500;
+  // full range, log scale 80–2000 nm
+  const lx = l => X0 + (Math.log10(l) - Math.log10(80)) / (Math.log10(2000) - Math.log10(80)) * (X1 - X0);
+  g.fillStyle = "#1f2937"; g.font = "bold 12px Arial"; g.textAlign = "left"; g.fillText("Whole spectrum (wavelength on a log scale)", X0, 14);
+  g.fillStyle = S.absorb ? "#e5e7eb" : "#0f172a"; g.fillRect(X0, 22, X1 - X0, 40);
+  if (S.absorb) for (let l = 380; l <= 750; l += 2) { const c = rgbOf(l); g.fillStyle = `rgb(${c})`; g.fillRect(lx(l), 22, lx(l + 2) - lx(l) + 1, 40); }
+  else { g.fillStyle = "rgba(255,255,255,.07)"; g.fillRect(lx(380), 22, lx(750) - lx(380), 40); }
+  const maxc = Math.max(1, ...Object.values(S.lines));
+  for (const k in S.lines) {
+    const [a, b] = k.split("-").map(Number), l = lam(a, b), x = lx(l), c = rgbOf(l), a1 = 0.35 + 0.65 * Math.log(1 + S.lines[k]) / Math.log(1 + maxc);
+    g.fillStyle = S.absorb ? `rgba(0,0,0,${0.6 + 0.4 * a1})` : c ? `rgba(${c},${a1})` : `rgba(203,213,225,${a1})`; g.fillRect(x - 1.5, 22, 3, 40);
+  }
+  g.fillStyle = "#6b7280"; g.font = "10px Arial"; g.textAlign = "center";
+  for (const l of [100, 200, 400, 700, 1000, 2000]) g.fillText(l, lx(l), 74);
+  g.fillText("UV", (lx(80) + lx(380)) / 2, 86); g.fillText("visible", (lx(380) + lx(750)) / 2, 86); g.fillText("infrared", (lx(750) + lx(2000)) / 2, 86);
+  g.fillText("Lyman (n→1)", lx(105), 98); g.fillText("Balmer (n→2)", lx(520), 98); g.fillText("Paschen (n→3)", lx(1300), 98);
+  // visible zoom
+  const vx = l => X0 + (l - 380) / 370 * (X1 - X0);
+  g.fillStyle = "#1f2937"; g.font = "bold 12px Arial"; g.textAlign = "left"; g.fillText("Visible region (what you see through a spectroscope)", X0, 124);
+  if (S.absorb) for (let l = 380; l <= 750; l++) { const c = rgbOf(l); g.fillStyle = `rgb(${c})`; g.fillRect(vx(l), 132, vx(l + 1) - vx(l) + 1, 56); }
+  else { g.fillStyle = "#0f172a"; g.fillRect(X0, 132, X1 - X0, 56); }
+  for (const k in S.lines) {
+    const [a, b] = k.split("-").map(Number), l = lam(a, b); if (l < 380 || l > 750) continue;
+    const c = rgbOf(l), x = vx(l), a1 = 0.35 + 0.65 * Math.log(1 + S.lines[k]) / Math.log(1 + maxc);
+    if (S.absorb) { g.fillStyle = "#000"; g.fillRect(x - 2, 132, 4, 56); }
+    else { const gr = g.createLinearGradient(x - 6, 0, x + 6, 0); gr.addColorStop(0, `rgba(${c},0)`); gr.addColorStop(0.5, `rgba(${c},${a1})`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(x - 6, 132, 12, 56); }
+    g.fillStyle = "#334155"; g.font = "10px Arial"; g.textAlign = "center"; g.fillText(Math.round(l), x, 200);
+  }
+  g.fillStyle = "#6b7280"; g.font = "10px Arial"; g.textAlign = "center"; for (const l of [400, 500, 600, 700]) g.fillText(l + " nm", vx(l), 222);
+}
+function calcText() {
+  const L = S.last;
+  if (!L) { $("calc").innerHTML = ""; return; }
+  const down = L.nf < L.ni, l = L.l, nu = C / (l * 1e-9), dE = Math.abs(L.dE), ser = SERIES[down ? L.nf : L.ni];
+  $("calc").innerHTML = `n = ${L.ni} → n = ${L.nf}: the atom <b>${down ? "emits" : "absorbs"}</b> a photon.<br>` +
+    `ΔE = E<sub>${L.nf}</sub> − E<sub>${L.ni}</sub> = ${down ? "−" : "+"}${sci(dE)} J &nbsp; photon energy E = hν = <b>${sci(dE)} J</b><br>` +
+    `ν = E/h = ${sci(nu)} s⁻¹ &nbsp; λ = c/ν = <b>${l.toFixed(0)} nm</b>, ${colourName(l)}` + (ser ? ` &nbsp;(${ser[0]} series)` : "");
+}
+function whyH(kind) {
+  const T = {
+    start: "The electron in a hydrogen atom can only have certain energies: the <b>energy levels</b>. Moving it up needs exactly the energy difference between two levels; when it falls back down, the atom gives out that energy as one photon. Because only certain energy differences exist, only certain wavelengths appear: a <b>line spectrum</b>, not a rainbow.",
+    auto: "In a discharge tube, collisions keep lifting electrons to higher levels, and they fall back in many different steps. Each kind of step always gives the same wavelength, so the lines build up. Drops to n = 1 are big jumps (ultraviolet, Lyman series); drops to n = 2 give the four <b>visible</b> lines (Balmer series); drops to n = 3 are small jumps (infrared).",
+    absorb: "<b>Absorption spectrum:</b> white light shines through hydrogen gas. Atoms absorb only the photons whose energy exactly matches a jump between levels, leaving <b>dark lines at exactly the same wavelengths</b> as the bright emission lines. (Cold hydrogen absorbs mainly from n = 1, in the ultraviolet; in a hot gas such as a star's atmosphere some atoms are already in n = 2, so the visible Balmer lines appear as dark lines too.)"
+  };
+  $("why").innerHTML = T[kind];
+}
+$("nbtns").innerHTML = Array.from({length: NMAX}, (_, i) => `<button class="n" data-n="${i + 1}">${i + 1}</button>`).join("");
+for (const b of document.querySelectorAll("[data-n]")) b.onclick = () => { S.auto = false; autoBtn(); transition(+b.dataset.n, true); };
+levels.addEventListener("pointerdown", ev => {
+  const r = levels.getBoundingClientRect(), y = (ev.clientY - r.top) / r.height * 380; let best = null, bd = 14;
+  for (let n = 1; n <= NMAX; n++) { const d = Math.abs(yOf(n) - y); if (d < bd) { bd = d; best = n; } }
+  if (best) { S.auto = false; autoBtn(); transition(best, true); }
+});
+function autoBtn() { $("b-auto").textContent = S.auto ? "⚡ Turn off" : "⚡ Turn on"; $("b-auto").classList.toggle("primary", !S.auto); }
+$("b-auto").onclick = () => { S.auto = !S.auto; autoBtn(); if (S.auto) whyH(S.absorb ? "absorb" : "auto"); };
+$("b-clear").onclick = () => { S.lines = {}; };
+$("b-em").onclick = () => { S.absorb = false; $("b-em").classList.add("on"); $("b-ab").classList.remove("on"); S.lines = {}; whyH("start"); };
+$("b-ab").onclick = () => { S.absorb = true; $("b-ab").classList.add("on"); $("b-em").classList.remove("on"); S.lines = {}; whyH("absorb"); };
+
+// ---------------------------------------------------------------- elements tab (visible lines in nm, relative intensity)
+const ELS = {
+  H: {f: "hydrogen", lines: [[656.3, 1], [486.1, 0.6], [434.0, 0.4], [410.2, 0.3]]},
+  He: {f: "helium", lines: [[447.1, 0.4], [471.3, 0.15], [492.2, 0.2], [501.6, 0.4], [587.6, 1], [667.8, 0.5], [706.5, 0.3]]},
+  Ne: {f: "neon", lines: [[540.1, 0.3], [585.2, 1], [588.2, 0.5], [594.5, 0.6], [597.6, 0.3], [603.0, 0.4], [607.4, 0.5], [609.6, 0.6], [614.3, 0.7], [616.4, 0.4], [621.7, 0.4], [626.6, 0.5], [633.4, 0.6], [638.3, 0.6], [640.2, 0.9], [650.7, 0.6], [659.9, 0.4], [692.9, 0.4], [703.2, 0.6]]},
+  Na: {f: "sodium", lines: [[589.0, 1], [589.6, 0.8], [568.8, 0.12], [498.3, 0.08], [615.4, 0.1]]},
+  Hg: {f: "mercury", lines: [[404.7, 0.5], [435.8, 1], [546.1, 0.9], [577.0, 0.5], [579.1, 0.5]]},
+  Li: {f: "lithium", lines: [[670.8, 1], [610.4, 0.3], [460.3, 0.12]]}
+};
+$("el").innerHTML = Object.keys(ELS).map(k => `<option value="${k}">${ELS[k].f} (${k})</option>`).join("");
+$("mq").innerHTML = Object.keys(ELS).map(k => `<label class="chk"><input type="checkbox" value="${k}"> ${k}</label>`).join(" ");
+function mixLines(list) { return list.flatMap(k => ELS[k].lines); }
+function glowColour(lines) { let r = 0, g = 0, b = 0, t = 0; for (const [l, i] of lines) { const c = rgbOf(l); if (!c) continue; r += c[0] * i; g += c[1] * i; b += c[2] * i; t += i; } const m = Math.max(r, g, b) || 1; return [r / m * 255, g / m * 255, b / m * 255].map(Math.round); }
+function drawTube(lines, label) {
+  const g = tg; g.clearRect(0, 0, 520, 220); const c = glowColour(lines);
+  g.fillStyle = "#334155"; g.fillRect(40, 92, 30, 36); g.fillRect(450, 92, 30, 36);
+  const gr = g.createRadialGradient(260, 110, 10, 260, 110, 260); gr.addColorStop(0, `rgba(${c},.45)`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(0, 20, 520, 180);
+  g.fillStyle = `rgba(${c},.9)`; g.beginPath(); g.roundRect ? g.roundRect(70, 96, 380, 28, 14) : g.rect(70, 96, 380, 28); g.fill();
+  g.strokeStyle = "rgba(255,255,255,.6)"; g.lineWidth = 2; g.beginPath(); g.moveTo(84, 103); g.lineTo(436, 103); g.stroke();
+  g.fillStyle = "#1f2937"; g.font = "bold 15px Arial"; g.textAlign = "center"; g.fillText(label, 260, 60);
+  g.font = "12px Arial"; g.fillStyle = "#6b7280"; g.fillText("high voltage", 55, 145); g.fillText("high voltage", 465, 145);
+  g.fillText("To your eye the tube is one color; a spectroscope splits it into lines.", 260, 190);
+}
+function strip(g, y, h, lines, label, X0, X1) {
+  const vx = l => X0 + (l - 380) / 370 * (X1 - X0);
+  g.fillStyle = "#0f172a"; g.fillRect(X0, y, X1 - X0, h);
+  for (const [l, i] of lines) { const c = rgbOf(l); if (!c) continue; const x = vx(l), gr = g.createLinearGradient(x - 4, 0, x + 4, 0); gr.addColorStop(0, `rgba(${c},0)`); gr.addColorStop(0.5, `rgba(${c},${0.3 + 0.7 * i})`); gr.addColorStop(1, `rgba(${c},0)`); g.fillStyle = gr; g.fillRect(x - 4, y, 8, h); }
+  g.fillStyle = "#1f2937"; g.font = "bold 11px Arial"; g.textAlign = "right"; g.fillText(label, X0 - 6, y + h / 2 + 4);
+}
+function drawSpectraEl() {
+  const g = sg; g.clearRect(0, 0, 520, 230);
+  const X0 = 90, X1 = 505, keys = Object.keys(ELS);
+  if (S.myst) { strip(g, 4, 34, mixLines(S.myst.els), "mystery", X0, X1); }
+  else strip(g, 4, 34, ELS[S.el].lines, ELS[S.el].f, X0, X1);
+  g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "left"; g.fillText("Reference spectra:", 4, 56);
+  keys.forEach((k, i) => strip(g, 62 + i * 25, 20, ELS[k].lines, ELS[k].f, X0, X1));
+  const vx = l => X0 + (l - 380) / 370 * (X1 - X0);
+  g.fillStyle = "#6b7280"; g.font = "10px Arial"; g.textAlign = "center"; for (const l of [400, 450, 500, 550, 600, 650, 700]) g.fillText(l, vx(l), 226);
+}
+function showEl() {
+  S.myst = null; for (const e of document.querySelectorAll(".mq")) e.style.display = "none"; $("mfb").style.display = "none";
+  drawTube(ELS[S.el].lines, `${ELS[S.el].f} discharge tube`); drawSpectraEl();
+  $("calc").innerHTML = ""; $("why").innerHTML = `Every element has its own set of energy levels, so its line spectrum is unique, like a <b>fingerprint</b>. ${S.el === "Ne" ? "Neon has many red and orange lines, which is why neon signs glow red-orange." : S.el === "Na" ? "Sodium's two very bright yellow lines (589.0 and 589.6 nm) make sodium street lamps yellow-orange." : S.el === "H" ? "These are the four Balmer lines from the Hydrogen atom tab." : ""}`;
+}
+$("el").onchange = () => { S.el = $("el").value; showEl(); };
+$("b-myst").onclick = () => {
+  const keys = Object.keys(ELS), n = Math.random() < 0.5 ? 1 : 2, els = [];
+  while (els.length < n) { const k = keys[Math.floor(Math.random() * keys.length)]; if (!els.includes(k)) els.push(k); }
+  S.myst = {els}; for (const e of document.querySelectorAll(".mq")) e.style.display = ""; $("mfb").style.display = "none";
+  $("mq").querySelectorAll("input").forEach(i => i.checked = false);
+  drawTube(mixLines(els), "mystery tube"); drawSpectraEl();
+  $("why").innerHTML = "The mystery tube contains one or two gases. Match <b>every</b> line in its spectrum to the reference spectra. A gas is present only if <b>all</b> of its lines are there.";
+};
+$("b-check").onclick = () => {
+  const pick = [...$("mq").querySelectorAll("input:checked")].map(i => i.value).sort(), ans = S.myst.els.slice().sort(), fb = $("mfb"); fb.style.display = "";
+  if (pick.join() === ans.join()) fb.innerHTML = `<span class="ok">✓ Correct: ${ans.map(k => ELS[k].f).join(" and ")}.</span> Press <b>Mystery tube</b> for another one.`;
+  else {
+    const extra = pick.filter(k => !ans.includes(k)), miss = ans.filter(k => !pick.includes(k));
+    fb.innerHTML = `<span class="bad">✗ Not quite.</span> ${extra.length ? `${extra.map(k => ELS[k].f).join(", ")}: some of its lines are missing from the mystery spectrum. ` : ""}${miss.length ? `${miss.length === 1 ? "One gas is" : "Some gases are"} missing: look for lines you have not explained yet.` : ""}`;
+  }
+};
+
+// ---------------------------------------------------------------- tabs
+function setMode(m) {
+  S.mode = m; S.auto = false; autoBtn();
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  $("gtitle").textContent = m === "hydrogen" ? "Hydrogen spectrum" : "Spectroscope view";
+  $("foot").innerHTML = m === "hydrogen" ? "Energy levels: E<sub>n</sub> = −2.178×10⁻¹⁸ J / n². h = 6.626×10⁻³⁴ J·s, c = 2.998×10⁸ m/s. The energy axis is to scale." : "Only the visible lines are shown; line positions are real, brightness is approximate.";
+  if (m === "hydrogen") { whyH("start"); calcText(); } else showEl();
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+// ---------------------------------------------------------------- tours
+const TOURS = {
+  hydrogen: [
+    ["#levels", "The energy levels of a hydrogen atom, to scale, with its electron. Tap a level (or use the buttons) to move the electron: up absorbs a photon, down emits one."],
+    ["#ctl", "Turn on the discharge tube to let many atoms jump at random, or switch to the absorption spectrum."],
+    ["#graphcard", "Every photon given out adds to its line in the spectrum. The calculation for the last jump is shown underneath."]
+  ],
+  elements: [
+    ["#tube", "A gas discharge tube. To your eye it glows one color."],
+    ["#graphcard", "The spectroscope splits the light into lines. Compare with the reference spectra."],
+    ["#ectl", "Look at each gas, then try a mystery tube with one or two gases in it."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-spec-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {hydrogen: "Hydrogen atom", elements: "Identify the gas"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+// ---------------------------------------------------------------- run
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.mode === "hydrogen") { stepH(dt); drawLevels(); drawSpectrumH(); }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const e = q.get("el"); if (e && ELS[e]) { S.el = e; $("el").value = e; }
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "elements" ? "elements" : "hydrogen");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>

@@ -29,6 +29,7 @@ namespace filter_chemsim\local;
 class sims {
     /** @var array name => [file, starting height in px, allowed options] */
     private const SIMS = [
+        'lewis' => ['file' => 'lewis.html', 'height' => 950, 'options' => ['mode', 'species', 'title', 'tour']],
         'massspec' => ['file' => 'massspec.html', 'height' => 900, 'options' => ['mode', 'el', 'title', 'tour']],
         'pes' => ['file' => 'pes.html', 'height' => 1150, 'options' => ['mode', 'el', 'compare', 'tabs', 'tour']],
         'boltzmann' => ['file' => 'boltzmann.html', 'height' => 900, 'options' => ['mode', 'gas', 'title', 'tour']],
@@ -39,6 +40,7 @@ class sims {
         'gibbs' => ['file' => 'gibbs.html', 'height' => 900, 'options' => ['mode', 'reaction', 'title', 'tour']],
         'kinetics' => ['file' => 'kinetics.html', 'height' => 1000, 'options' => ['mode', 'order', 'title', 'tour']],
         'solubility' => ['file' => 'solubility.html', 'height' => 1050, 'options' => ['mode', 'salt', 'predict', 'title', 'tour']],
+        'spectra' => ['file' => 'spectra.html', 'height' => 900, 'options' => ['mode', 'el', 'title', 'tour']],
         'titration' => ['file' => 'titration.html', 'height' => 1000, 'options' => ['mode', 'analyte', 'title', 'tour']],
         'vaporpressure' => ['file' => 'vaporpressure.html', 'height' => 1000, 'options' => ['mode', 'liquid', 'title', 'tour']],
     ];

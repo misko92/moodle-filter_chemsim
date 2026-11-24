@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lewis Structures and VSEPR</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; max-width: 100%; }
+.ctl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 15px; line-height: 1.6; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+.ok { color: #047857; } .bad { color: #b91c1c; } .warn { color: #b45309; }
+.mode { display: none; } .mode.active { display: block; }
+.counter { font-size: 18px; font-weight: bold; }
+table.stats { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+table.stats td, table.stats th { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+table.stats th { font-size: 12px; color: var(--muted); font-weight: normal; width: 10em; }
+details { margin-top: 8px; font-size: 14px; } summary { cursor: pointer; color: var(--accent); }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Lewis Structures and Molecular Shape</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="build">Build a Lewis structure</button>
+  <button data-mode="shape">3D shape (VSEPR)</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 480px" id="boxcard">
+    <div class="ctl" style="margin:0 0 8px">
+      <b>Species</b>
+      <div><select id="sp"></select><button id="b-rand">🎲 Random</button></div>
+    </div>
+    <section class="mode" id="m-build">
+      <canvas id="draw" width="520" height="360" aria-label="Lewis structure: tap a bond to change it, tap an atom to add a lone pair"></canvas>
+      <div class="ctl" id="ctl">
+        <b>Electrons</b>
+        <div><span class="counter" id="count"></span></div>
+        <b>Show</b>
+        <div><label class="chk"><input type="checkbox" id="showfc"> formal charges</label><label class="chk"><input type="checkbox" id="showec"> electrons around each atom</label></div>
+        <b></b>
+        <div><button id="b-check" class="primary">✓ Check</button><button id="b-reset">↺ Clear</button><button id="b-show">Show a correct structure</button></div>
+      </div>
+      <div class="note">Tap a <b>bond</b> to change it: single → double → triple → single. Tap an <b>atom</b> to add a lone pair (after 4 it goes back to none).</div>
+    </section>
+    <section class="mode" id="m-shape">
+      <canvas id="d3" width="520" height="360" aria-label="Three-dimensional model of the molecule; drag to rotate"></canvas>
+      <div class="ctl">
+        <b>Show</b>
+        <div><label class="chk"><input type="checkbox" id="showlp" checked> lone pairs</label><label class="chk"><input type="checkbox" id="showdip" checked> bond dipoles</label><label class="chk"><input type="checkbox" id="spin" checked> rotate</label></div>
+      </div>
+      <div class="note">Drag the model to turn it.</div>
+    </section>
+  </div>
+
+  <div class="card" style="flex:1 1 480px" id="infocard">
+    <section class="mode" id="i-build">
+      <h2>Count the valence electrons</h2>
+      <div class="big" id="vcount"></div>
+      <div class="why" id="feedback"></div>
+      <div class="big" id="reso" style="margin-top:8px"></div>
+    </section>
+    <section class="mode" id="i-shape">
+      <canvas id="mini" width="520" height="220" aria-label="Lewis structure"></canvas>
+      <table class="stats" id="shapetab"></table>
+      <div class="why" id="shapewhy"></div>
+    </section>
+  </div>
+</div>
+<div class="note">Rules used: H gets 2 electrons; C, N, O and F get exactly 8; B and Be may have fewer than 8; atoms in period 3 and below may have more than 8 when they are the central atom. The best structure is the one with the smallest formal charges, with any negative formal charge on the most electronegative atom.</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+// ---------------------------------------------------------------- elements
+const VAL = {H: 1, Be: 2, B: 3, C: 4, N: 5, O: 6, F: 7, Si: 4, P: 5, S: 6, Cl: 7, Br: 7, I: 7, Xe: 8};
+const EN = {H: 2.20, Be: 1.57, B: 2.04, C: 2.55, N: 3.04, O: 3.44, F: 3.98, Si: 1.90, P: 2.19, S: 2.58, Cl: 3.16, Br: 2.96, I: 2.66, Xe: 2.60};
+const PERIOD = {H: 1, Be: 2, B: 2, C: 2, N: 2, O: 2, F: 2, Si: 3, P: 3, S: 3, Cl: 3, Br: 4, I: 5, Xe: 5};
+const CPK = {H: "#f8fafc", Be: "#a3e635", B: "#fda4af", C: "#475569", N: "#3b82f6", O: "#ef4444", F: "#84cc16", Si: "#d4a373", P: "#f97316", S: "#eab308", Cl: "#22c55e", Br: "#9f1239", I: "#7e22ce", Xe: "#06b6d4"};
+// ---------------------------------------------------------------- species
+const SUB = {"0": "₀", "1": "₁", "2": "₂", "3": "₃", "4": "₄", "5": "₅", "6": "₆"};
+const SPECIES = [];
+function center(id, name, c, terms, charge = 0) {
+  const n = terms.length, atoms = [{el: c, x: 0, y: 0}], bonds = [];
+  const ang = {1: [0], 2: [180, 0], 3: [90, 210, 330], 4: [90, 0, 270, 180], 5: [90, 18, 306, 234, 162], 6: [90, 30, 330, 270, 210, 150]}[n];
+  const r = n >= 5 ? 1.45 : 1.35;
+  terms.forEach((t, i) => { const a = ang[i] * Math.PI / 180; atoms.push({el: t, x: r * Math.cos(a), y: -r * Math.sin(a)}); bonds.push([0, i + 1]); });
+  SPECIES.push({id, name, atoms, bonds, charge, single: n >= 2});
+}
+function chain(id, name, atoms, bonds, charge = 0) { SPECIES.push({id, name, atoms: atoms.map(([el, x, y]) => ({el, x, y})), bonds, charge, single: false}); }
+center("H2O", "H₂O", "O", ["H", "H"]);
+center("NH3", "NH₃", "N", ["H", "H", "H"]);
+center("CH4", "CH₄", "C", ["H", "H", "H", "H"]);
+center("CCl4", "CCl₄", "C", ["Cl", "Cl", "Cl", "Cl"]);
+center("NH4", "NH₄⁺", "N", ["H", "H", "H", "H"], 1);
+center("H3O", "H₃O⁺", "O", ["H", "H", "H"], 1);
+center("CO2", "CO₂", "C", ["O", "O"]);
+center("HCN", "HCN", "C", ["H", "N"]);
+center("H2CO", "H₂CO (formaldehyde)", "C", ["O", "H", "H"]);
+center("BF3", "BF₃", "B", ["F", "F", "F"]);
+center("BeCl2", "BeCl₂", "Be", ["Cl", "Cl"]);
+center("PCl3", "PCl₃", "P", ["Cl", "Cl", "Cl"]);
+center("O3", "O₃", "O", ["O", "O"]);
+center("NO2m", "NO₂⁻", "N", ["O", "O"], -1);
+center("NO3m", "NO₃⁻", "N", ["O", "O", "O"], -1);
+center("CO3", "CO₃²⁻", "C", ["O", "O", "O"], -2);
+center("HCOO", "HCOO⁻ (formate)", "C", ["H", "O", "O"], -1);
+center("SO2", "SO₂", "S", ["O", "O"]);
+center("SO3", "SO₃", "S", ["O", "O", "O"]);
+center("SO3m", "SO₃²⁻", "S", ["O", "O", "O"], -2);
+center("SO4", "SO₄²⁻", "S", ["O", "O", "O", "O"], -2);
+center("PO4", "PO₄³⁻", "P", ["O", "O", "O", "O"], -3);
+center("ClO3", "ClO₃⁻", "Cl", ["O", "O", "O"], -1);
+center("ClO4", "ClO₄⁻", "Cl", ["O", "O", "O", "O"], -1);
+center("PCl5", "PCl₅", "P", ["Cl", "Cl", "Cl", "Cl", "Cl"]);
+center("SF6", "SF₆", "S", ["F", "F", "F", "F", "F", "F"]);
+center("SF4", "SF₄", "S", ["F", "F", "F", "F"]);
+center("ClF3", "ClF₃", "Cl", ["F", "F", "F"]);
+center("BrF5", "BrF₅", "Br", ["F", "F", "F", "F", "F"]);
+center("XeF2", "XeF₂", "Xe", ["F", "F"]);
+center("XeF4", "XeF₄", "Xe", ["F", "F", "F", "F"]);
+center("I3", "I₃⁻", "I", ["I", "I"], -1);
+center("ICl4", "ICl₄⁻", "I", ["Cl", "Cl", "Cl", "Cl"], -1);
+chain("N2", "N₂", [["N", -0.7, 0], ["N", 0.7, 0]], [[0, 1]]);
+chain("CO", "CO", [["C", -0.7, 0], ["O", 0.7, 0]], [[0, 1]]);
+chain("CN", "CN⁻", [["C", -0.7, 0], ["N", 0.7, 0]], [[0, 1]], -1);
+chain("OH", "OH⁻", [["O", -0.6, 0], ["H", 0.7, 0]], [[0, 1]], -1);
+chain("C2H4", "C₂H₄", [["C", -0.7, 0], ["C", 0.7, 0], ["H", -1.5, 0.95], ["H", -1.5, -0.95], ["H", 1.5, 0.95], ["H", 1.5, -0.95]], [[0, 1], [0, 2], [0, 3], [1, 4], [1, 5]]);
+chain("C2H2", "C₂H₂", [["H", -2.1, 0], ["C", -0.7, 0], ["C", 0.7, 0], ["H", 2.1, 0]], [[0, 1], [1, 2], [2, 3]]);
+chain("CH3OH", "CH₃OH", [["C", -0.8, 0], ["O", 0.6, 0], ["H", -0.8, 1.25], ["H", -0.8, -1.25], ["H", -2.1, 0], ["H", 1.6, -0.9]], [[0, 1], [0, 2], [0, 3], [0, 4], [1, 5]]);
+chain("H2O2", "H₂O₂", [["H", -2.0, 0.8], ["O", -0.7, 0], ["O", 0.7, 0], ["H", 2.0, -0.8]], [[0, 1], [1, 2], [2, 3]]);
+chain("N2H4", "N₂H₄", [["N", -0.7, 0], ["N", 0.7, 0], ["H", -1.5, 0.95], ["H", -1.5, -0.95], ["H", 1.5, 0.95], ["H", 1.5, -0.95]], [[0, 1], [0, 2], [0, 3], [1, 4], [1, 5]]);
+chain("HNO3", "HNO₃", [["H", -2.2, 0], ["O", -0.9, 0], ["N", 0.45, 0], ["O", 1.15, 1.15], ["O", 1.15, -1.15]], [[0, 1], [1, 2], [2, 3], [2, 4]]);
+
+// ---------------------------------------------------------------- rules and the best structures (worked out once, by enumeration)
+function rule(sp, i) {
+  const el = sp.atoms[i].el, deg = sp.bonds.filter(b => b.includes(i)).length;
+  if (el === "H") return "H";
+  if (el === "B" || el === "Be") return "lte8";
+  if (PERIOD[el] >= 3 && deg >= 2) return "exp";
+  return "oct";
+}
+const totalV = sp => sp.atoms.reduce((t, a) => t + VAL[a.el], 0) - sp.charge;
+function boSum(sp, ord) { const s = sp.atoms.map(() => 0); sp.bonds.forEach(([a, b], k) => { s[a] += ord[k]; s[b] += ord[k]; }); return s; }
+const fcOf = (sp, ord, lp) => { const s = boSum(sp, ord); return sp.atoms.map((a, i) => VAL[a.el] - 2 * lp[i] - s[i]); };
+function solve(sp) {
+  const nb = sp.bonds.length, V = totalV(sp), out = [];
+  const R = sp.atoms.map((a, i) => rule(sp, i));
+  for (let code = 0; code < Math.pow(3, nb); code++) {
+    const ord = []; let c = code; for (let k = 0; k < nb; k++) { ord.push(1 + c % 3); c = Math.floor(c / 3); }
+    const s = boSum(sp, ord), rem = V - 2 * ord.reduce((a, b) => a + b, 0);
+    if (rem < 0 || rem % 2) continue;
+    const lp = []; let ok = true, flex = -1, fixed = 0;
+    for (let i = 0; i < sp.atoms.length && ok; i++) {
+      if (R[i] === "H") { if (s[i] !== 1) ok = false; lp.push(0); }
+      else if (R[i] === "oct") { const need = 8 - 2 * s[i]; if (need < 0) ok = false; lp.push(need / 2); fixed += need / 2; }
+      else if (R[i] === "lte8") { if (2 * s[i] > 8) ok = false; lp.push(0); }
+      else { flex = i; lp.push(0); }
+    }
+    if (!ok) continue;
+    const left = rem / 2 - fixed; if (left < 0) continue;
+    if (flex < 0) { if (left !== 0) continue; }
+    else { lp[flex] = left; const e = 2 * s[flex] + 2 * left; if (e < 8 || e > 14) continue; }
+    const fc = fcOf(sp, ord, lp);
+    out.push({ord, lp, fc, abs: fc.reduce((t, f) => t + Math.abs(f), 0), en: fc.reduce((t, f, i) => t + f * EN[sp.atoms[i].el], 0)});
+  }
+  const minAbs = Math.min(...out.map(o => o.abs)), cand = out.filter(o => o.abs === minAbs), minEn = Math.min(...cand.map(o => o.en));
+  sp.best = cand.filter(o => o.en < minEn + 1e-6); sp.minAbs = minAbs; sp.valid = out;
+}
+SPECIES.forEach(solve);
+const key = (ord, lp) => ord.join(",") + "|" + lp.join(",");
+
+// ---------------------------------------------------------------- state
+const S = {mode: "build", sp: SPECIES[0], ord: [], lp: [], found: new Set(), bad: new Set(), showfc: false, showec: false, rot: {a: 0.6, b: -0.35}, spin: true};
+function resetDraw() { S.ord = S.sp.bonds.map(() => 1); S.lp = S.sp.atoms.map(() => 0); S.bad = new Set(); }
+
+// ---------------------------------------------------------------- 2D drawing
+const draw = $("draw"), dg = draw.getContext("2d"), mini = $("mini"), mg = mini.getContext("2d"), d3 = $("d3"), g3 = d3.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(draw, 520, 360); hiDPI(mini, 520, 220); hiDPI(d3, 520, 360);
+function layout(sp, W, H, unit) {
+  const xs = sp.atoms.map(a => a.x), ys = sp.atoms.map(a => a.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  return sp.atoms.map(a => ({x: W / 2 + (a.x - cx) * unit, y: H / 2 + (a.y - cy) * unit}));
+}
+function angDist(a, b) { let d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+// directions (degrees, 0 = right, counter-clockwise) for lone pairs and labels around atom i
+function freeDirs(sp, P, i, nlp) {
+  const used = sp.bonds.filter(b => b.includes(i)).map(([a, b]) => { const j = a === i ? b : a; return Math.atan2(-(P[j].y - P[i].y), P[j].x - P[i].x) * 180 / Math.PI; });
+  const out = [];
+  for (let k = 0; k < nlp; k++) {
+    let best = null, bs = -1;
+    for (let c = 0; c < 360; c += 45) {
+      const all = used.concat(out), d = all.length ? Math.min(...all.map(u => angDist(u, c))) : 180, score = d + (c % 90 === 0 ? 10 : 0);
+      if (score > bs) { bs = score; best = c; }
+    }
+    out.push(best);
+  }
+  return {lp: out, used: used.concat(out)};
+}
+function drawLewis(g, sp, ord, lp, W, H, unit, opts) {
+  g.clearRect(0, 0, W, H);
+  const P = layout(sp, W, H, unit), fc = fcOf(sp, ord, lp), s = boSum(sp, ord), R0 = Math.max(13, unit * 0.24);
+  sp.bonds.forEach(([a, b], k) => {
+    const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+    const offs = ord[k] === 1 ? [0] : ord[k] === 2 ? [-4, 4] : [-6.5, 0, 6.5];
+    g.strokeStyle = "#1f2937"; g.lineWidth = 2.4;
+    for (const o of offs) { g.beginPath(); g.moveTo(P[a].x + ux * R0 + nx * o, P[a].y + uy * R0 + ny * o); g.lineTo(P[b].x - ux * R0 + nx * o, P[b].y - uy * R0 + ny * o); g.stroke(); }
+  });
+  sp.atoms.forEach((a, i) => {
+    const p = P[i];
+    if (opts.bad && opts.bad.has(i)) { g.beginPath(); g.arc(p.x, p.y, R0 + 12, 0, 6.283); g.fillStyle = "rgba(239,68,68,.14)"; g.fill(); g.strokeStyle = "#ef4444"; g.lineWidth = 2; g.stroke(); }
+    g.fillStyle = "#1f2937"; g.font = `bold ${Math.round(unit * 0.32)}px Arial`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(a.el, p.x, p.y + 1);
+    const fd = freeDirs(sp, P, i, lp[i]), dr = R0 + 6;
+    for (const d of fd.lp) {
+      const r = d * Math.PI / 180, ux = Math.cos(r), uy = -Math.sin(r), nx = -uy, ny = ux;
+      for (const s2 of [-4.2, 4.2]) { g.beginPath(); g.arc(p.x + ux * dr + nx * s2, p.y + uy * dr + ny * s2, 2.8, 0, 6.283); g.fillStyle = "#1d4ed8"; g.fill(); }
+    }
+    const diag = [45, 135, 225, 315].sort((x, y) => Math.min(...fd.used.map(u => angDist(u, y)), 180) - Math.min(...fd.used.map(u => angDist(u, x)), 180));
+    if (opts.fc && fc[i] !== 0) {
+      const r = diag[0] * Math.PI / 180, x = p.x + Math.cos(r) * (R0 + 13), y = p.y - Math.sin(r) * (R0 + 13);
+      g.beginPath(); g.arc(x, y, 10, 0, 6.283); g.fillStyle = fc[i] > 0 ? "#fee2e2" : "#dbeafe"; g.fill(); g.strokeStyle = fc[i] > 0 ? "#dc2626" : "#2563eb"; g.lineWidth = 1.5; g.stroke();
+      g.fillStyle = fc[i] > 0 ? "#b91c1c" : "#1d4ed8"; g.font = "bold 11px Arial"; g.fillText((fc[i] > 0 ? "+" : "−") + Math.abs(fc[i]), x, y + 0.5);
+    }
+    if (opts.ec) {
+      const e = 2 * lp[i] + 2 * s[i], need = a.el === "H" ? 2 : 8, r = diag[1] * Math.PI / 180, x = p.x + Math.cos(r) * (R0 + 13), y = p.y - Math.sin(r) * (R0 + 13);
+      g.fillStyle = (a.el === "H" ? e === 2 : rule(sp, i) === "lte8" ? e <= 8 : rule(sp, i) === "exp" ? e >= 8 && e <= 14 : e === 8) ? "#047857" : "#b45309";
+      g.font = "bold 11px Arial"; g.fillText(e, x, y);
+    }
+  });
+  g.textBaseline = "alphabetic";
+  if (sp.charge && opts.brackets !== false) {
+    const xs = P.map(p => p.x), ys = P.map(p => p.y), x0 = Math.min(...xs) - unit * 0.75, x1 = Math.max(...xs) + unit * 0.75, y0 = Math.min(...ys) - unit * 0.75, y1 = Math.max(...ys) + unit * 0.75;
+    g.strokeStyle = "#475569"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(x0 + 8, y0); g.lineTo(x0, y0); g.lineTo(x0, y1); g.lineTo(x0 + 8, y1); g.stroke();
+    g.beginPath(); g.moveTo(x1 - 8, y0); g.lineTo(x1, y0); g.lineTo(x1, y1); g.lineTo(x1 - 8, y1); g.stroke();
+    g.fillStyle = "#1f2937"; g.font = "bold 16px Arial"; g.textAlign = "left";
+    g.fillText((Math.abs(sp.charge) > 1 ? Math.abs(sp.charge) : "") + (sp.charge > 0 ? "+" : "−"), x1 + 4, y0 + 10);
+  }
+  return P;
+}
+const UNIT = 72;
+function render() {
+  if (S.mode !== "build") return;
+  S.P = drawLewis(dg, S.sp, S.ord, S.lp, 520, 360, UNIT, {fc: S.showfc, ec: S.showec, bad: S.bad});
+  const V = totalV(S.sp), used = 2 * S.ord.reduce((a, b) => a + b, 0) + 2 * S.lp.reduce((a, b) => a + b, 0);
+  $("count").innerHTML = `<span class="${used === V ? "ok" : used > V ? "bad" : ""}">${used} of ${V} placed</span>`;
+}
+// ---------------------------------------------------------------- taps
+function pt(ev, c, W, H) { const r = c.getBoundingClientRect(); return {x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H}; }
+draw.addEventListener("pointerdown", ev => {
+  const p = pt(ev, draw, 520, 360), P = S.P; if (!P) return;
+  for (let i = 0; i < P.length; i++) if (Math.hypot(p.x - P[i].x, p.y - P[i].y) < 24) {
+    S.lp[i] = S.sp.atoms[i].el === "H" ? 0 : (S.lp[i] + 1) % 5; changed(); return;
+  }
+  let best = -1, bd = 14;
+  S.sp.bonds.forEach(([a, b], k) => {
+    const ax = P[a].x, ay = P[a].y, bx = P[b].x, by = P[b].y, L2 = (bx - ax) ** 2 + (by - ay) ** 2, t = Math.max(0.15, Math.min(0.85, ((p.x - ax) * (bx - ax) + (p.y - ay) * (by - ay)) / L2));
+    const d = Math.hypot(p.x - (ax + t * (bx - ax)), p.y - (ay + t * (by - ay))); if (d < bd) { bd = d; best = k; }
+  });
+  if (best >= 0) { S.ord[best] = S.ord[best] % 3 + 1; changed(); }
+});
+function changed() { S.bad = new Set(); render(); }
+
+// ---------------------------------------------------------------- checking
+function vText(sp) {
+  const counts = {}; sp.atoms.forEach(a => counts[a.el] = (counts[a.el] || 0) + 1);
+  const parts = Object.keys(counts).map(el => counts[el] > 1 ? `${el} ${counts[el]} × ${VAL[el]}` : `${el} ${VAL[el]}`);
+  let t = parts.join(" + ");
+  if (sp.charge) t += sp.charge < 0 ? ` + ${-sp.charge} (charge ${Math.abs(sp.charge) > 1 ? Math.abs(sp.charge) : ""}−)` : ` − ${sp.charge} (charge +)`;
+  return `${sp.name}: ${t} = <b>${totalV(sp)} valence electrons</b>`;
+}
+function check() {
+  const sp = S.sp, V = totalV(sp), s = boSum(sp, S.ord), used = 2 * S.ord.reduce((a, b) => a + b, 0) + 2 * S.lp.reduce((a, b) => a + b, 0), fb = $("feedback");
+  S.bad = new Set();
+  const msgs = [];
+  if (used !== V) msgs.push(`You have placed <b>${used}</b> electrons, but ${sp.name} has <b>${V}</b>. ${used < V ? "Add more lone pairs (or multiple bonds)." : "Remove some."}`);
+  sp.atoms.forEach((a, i) => {
+    const e = 2 * S.lp[i] + 2 * s[i], R = rule(sp, i);
+    if (R === "H" && e !== 2) { S.bad.add(i); msgs.push(`H must have exactly 2 electrons (one single bond).`); }
+    else if (R === "oct" && e > 8) { S.bad.add(i); msgs.push(`${a.el} has ${e} electrons: ${PERIOD[a.el] === 2 ? "second-period atoms can never have more than 8" : "a terminal atom like this one needs exactly 8"}.`); }
+    else if (R === "oct" && e < 8) { S.bad.add(i); msgs.push(`${a.el} has only ${e} electrons; it needs an octet (8).`); }
+    else if (R === "exp" && e < 8) { S.bad.add(i); msgs.push(`${a.el} has only ${e} electrons; it needs at least 8.`); }
+    else if (R === "exp" && e > 14) { S.bad.add(i); msgs.push(`${a.el} has ${e} electrons: that is too many, even for an expanded octet.`); }
+    else if (R === "lte8" && e > 8) { S.bad.add(i); msgs.push(`${a.el} has ${e} electrons: more than 8 is not possible for a second-period atom.`); }
+  });
+  render();
+  if (msgs.length) { fb.innerHTML = `<span class="bad">✗ Not a valid structure yet.</span><ul style="margin:6px 0 0 18px;padding:0">${[...new Set(msgs)].map(m => `<li>${m}</li>`).join("")}</ul>`; return; }
+  const k = key(S.ord, S.lp), best = sp.best.find(b => key(b.ord, b.lp) === k), fc = fcOf(sp, S.ord, S.lp), abs = fc.reduce((t, f) => t + Math.abs(f), 0);
+  if (best) {
+    S.found.add(k); S.showfc = true; $("showfc").checked = true; render();
+    const n = sp.best.length;
+    fb.innerHTML = `<span class="ok">✓ Correct!</span> ${abs === 0 ? "Every formal charge is zero." : `The formal charges are as small as possible (total ${abs}), and ${fc.some(f => f < 0) ? "the negative charge is on the most electronegative atom(s)" : "they cannot be any smaller"}.`}` +
+      (sp.atoms.some((a, i) => rule(sp, i) === "exp" && 2 * S.lp[i] + 2 * s[i] > 8) ? ` ${sp.atoms[0].el} has an <b>expanded octet</b> (${2 * S.lp[0] + 2 * s[0]} electrons), which is possible because it is in period ${PERIOD[sp.atoms[0].el]}.` : "") +
+      (sp.atoms.some((a, i) => rule(sp, i) === "lte8" && 2 * s[i] < 8) ? ` ${sp.atoms.find((a, i) => rule(sp, i) === "lte8").el} has an <b>incomplete octet</b>: that is normal for B and Be.` : "");
+    reso();
+    return;
+  }
+  // valid but not the best
+  const sameAbs = abs === sp.minAbs;
+  fb.innerHTML = `<span class="warn">≈ Valid structure, but not the best one.</span> ` + (sameAbs
+    ? "The total formal charge is as small as possible, but a negative formal charge should be on the <b>most electronegative</b> atom."
+    : `Its formal charges add up to ${abs} (ignoring signs); the best structure has only <b>${sp.minAbs}</b>. ${sp.atoms.some((a, i) => rule(sp, i) === "exp") ? `${sp.atoms[0].el} is in period ${PERIOD[sp.atoms[0].el]}, so it can have an expanded octet: try changing bonds to the central atom.` : "Try moving electrons between lone pairs and bonds."}`);
+  S.showfc = true; $("showfc").checked = true; render();
+}
+function reso() {
+  const sp = S.sp, n = sp.best.length;
+  if (n === 1) { $("reso").innerHTML = S.found.size ? "This species has <b>one</b> best structure (no resonance)." : ""; return; }
+  $("reso").innerHTML = `This species has <b>${n} equivalent resonance structures</b>. Found: <b>${[...S.found].filter(k => sp.best.some(b => key(b.ord, b.lp) === k)).length} of ${n}</b>.` +
+    (S.found.size < n ? " Move the double bond (or bonds) to find the others." : ` <span class="ok">All found!</span> The real ${sp.name} is an average of these: all the equivalent bonds have the same length.`);
+}
+function newSpecies(sp) {
+  S.sp = sp; S.found = new Set(); resetDraw(); S.showfc = false; $("showfc").checked = false;
+  $("vcount").innerHTML = `<details><summary>Show how to count</summary><div style="margin-top:6px">${vText(sp)}</div></details>`;
+  $("feedback").innerHTML = "Start by placing bonds and lone pairs until all the valence electrons are used. Every bond starts as a single bond.";
+  $("reso").innerHTML = "";
+  render(); if (S.mode === "shape") shape();
+}
+$("b-check").onclick = check;
+$("b-reset").onclick = () => { resetDraw(); render(); $("feedback").innerHTML = "Cleared."; };
+$("b-show").onclick = () => {
+  const sp = S.sp, next = sp.best.find(b => !S.found.has(key(b.ord, b.lp))) || sp.best[0];
+  S.ord = next.ord.slice(); S.lp = next.lp.slice(); S.showfc = true; $("showfc").checked = true; S.bad = new Set(); render();
+  $("feedback").innerHTML = `Here is ${sp.best.length > 1 ? "one of the best structures" : "the best structure"}. Clear it and try to draw it yourself, or try another species.`;
+};
+$("showfc").onchange = () => { S.showfc = $("showfc").checked; render(); };
+$("showec").onchange = () => { S.showec = $("showec").checked; render(); };
+
+// ---------------------------------------------------------------- VSEPR
+const GEO = {
+  "2,0": ["linear", "linear", "180°", "sp"], "3,0": ["trigonal planar", "trigonal planar", "120°", "sp²"], "3,1": ["trigonal planar", "bent", "less than 120°", "sp²"],
+  "4,0": ["tetrahedral", "tetrahedral", "109.5°", "sp³"], "4,1": ["tetrahedral", "trigonal pyramidal", "less than 109.5° (107° in NH₃)", "sp³"], "4,2": ["tetrahedral", "bent", "less than 109.5° (104.5° in H₂O)", "sp³"],
+  "5,0": ["trigonal bipyramidal", "trigonal bipyramidal", "90°, 120° and 180°", "sp³d (beyond AP)"], "5,1": ["trigonal bipyramidal", "seesaw", "less than 90° and 120°", "sp³d (beyond AP)"],
+  "5,2": ["trigonal bipyramidal", "T-shaped", "less than 90°", "sp³d (beyond AP)"], "5,3": ["trigonal bipyramidal", "linear", "180°", "sp³d (beyond AP)"],
+  "6,0": ["octahedral", "octahedral", "90°", "sp³d² (beyond AP)"], "6,1": ["octahedral", "square pyramidal", "less than 90°", "sp³d² (beyond AP)"], "6,2": ["octahedral", "square planar", "90°", "sp³d² (beyond AP)"]
+};
+const nrm = v => { const l = Math.hypot(...v); return v.map(x => x / l); };
+function domainDirs(n, nlp) {
+  // returns [lone-pair directions, bond directions]
+  let D;
+  if (n === 2) D = [[1, 0, 0], [-1, 0, 0]];
+  if (n === 3) D = [90, 210, 330].map(a => [Math.cos(a * Math.PI / 180), Math.sin(a * Math.PI / 180), 0]);
+  if (n === 4) D = [[0, 1, 0], [0.943, -0.333, 0], [-0.471, -0.333, 0.816], [-0.471, -0.333, -0.816]];
+  if (n === 5) { const eq = [0, 120, 240].map(a => [Math.cos(a * Math.PI / 180), 0, Math.sin(a * Math.PI / 180)]); D = eq.concat([[0, 1, 0], [0, -1, 0]]); }   // lone pairs go equatorial first
+  if (n === 6) D = [[0, 1, 0], [0, -1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]];   // 2 lone pairs: trans
+  D = D.map(nrm);
+  if (n === 4 && nlp === 0) return [[], D];
+  return [D.slice(0, nlp), D.slice(nlp)];
+}
+function shapeInfo(sp) {
+  const b = sp.best[0], nt = sp.atoms.length - 1, nlp = b.lp[0], n = nt + nlp, g = GEO[`${n},${nlp}`];
+  return {b, nt, nlp, n, g};
+}
+let dragging = null;
+function shape() {
+  const sp = S.sp;
+  if (!sp.single) {
+    g3.clearRect(0, 0, 520, 360); g3.fillStyle = "#6b7280"; g3.font = "15px Arial"; g3.textAlign = "center";
+    g3.fillText("Choose a species with one central atom", 260, 170); g3.fillText("to see its 3D shape.", 260, 192);
+    mg.clearRect(0, 0, 520, 220); $("shapetab").innerHTML = ""; $("shapewhy").innerHTML = `${sp.name} has no single central atom (or only two atoms), so VSEPR is applied to each atom separately. Pick a species such as H₂O, NH₃, SF₄ or XeF₄.`; return;
+  }
+  const I = shapeInfo(sp);
+  drawLewis(mg, sp, I.b.ord, I.b.lp, 520, 220, 52, {fc: true, ec: false});
+  // polarity from bond dipoles
+  const [lpd, bd] = domainDirs(I.n, I.nlp);
+  let net = [0, 0, 0]; for (let k = 0; k < I.nt; k++) { const t = sp.atoms[k + 1].el, d = EN[t] - EN[sp.atoms[0].el]; net = net.map((x, j) => x + d * bd[k][j]); }
+  const pol = Math.hypot(...net) > 0.05;
+  $("shapetab").innerHTML = [
+    ["Electron domains on " + sp.atoms[0].el, `${I.n} (${I.nt} bonded atom${I.nt > 1 ? "s" : ""} + ${I.nlp} lone pair${I.nlp === 1 ? "" : "s"}); a double or triple bond counts as one domain`],
+    ["Electron-domain geometry", I.g[0]], ["Molecular geometry", `<b>${I.g[1]}</b>`], ["Bond angle", I.g[2]], ["Hybridization", I.g[3]],
+    ["Polarity", sp.charge ? "an ion (polarity is used for neutral molecules)" : pol ? "<b>polar</b>: the bond dipoles do not cancel" : (sp.atoms.slice(1).every(a => EN[a.el] === EN[sp.atoms[0].el]) ? "nonpolar (nonpolar bonds)" : "<b>nonpolar</b>: the bond dipoles cancel")]
+  ].map(([a, b]) => `<tr><th>${a}</th><td>${b}</td></tr>`).join("");
+  const T = {
+    0: "With no lone pairs on the central atom, the molecular geometry is the same as the electron-domain geometry.",
+    1: "A lone pair takes up a domain but is not part of the shape we name, so the molecular geometry is different from the electron-domain geometry. Lone pairs repel more strongly than bonding pairs, squeezing the bond angles.",
+    2: "Two lone pairs push the bonds closer together.", 3: "Three lone pairs occupy the equatorial positions, leaving the two bonds opposite each other."
+  };
+  let w = T[Math.min(3, I.nlp)];
+  if (I.n === 5 && I.nlp) w += " In a trigonal bipyramid, lone pairs always go in the <b>equatorial</b> positions, where they have more room (fewer 90° neighbours).";
+  if (I.n === 6 && I.nlp === 2) w += " With two lone pairs in an octahedron, they sit <b>opposite</b> each other, leaving a square planar shape.";
+  $("shapewhy").innerHTML = w;
+}
+function rotV(v) {
+  const {a, b} = S.rot, ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b);
+  const x1 = v[0] * ca + v[2] * sa, z1 = -v[0] * sa + v[2] * ca, y2 = v[1] * cb - z1 * sb, z2 = v[1] * sb + z1 * cb;
+  return [x1, y2, z2];
+}
+function draw3D() {
+  const g = g3, sp = S.sp; if (!sp.single) return;
+  g.clearRect(0, 0, 520, 360);
+  const I = shapeInfo(sp), [lpd, bd] = domainDirs(I.n, I.nlp), C = [260, 185], L = 115, proj = v => { const r = rotV(v), s = 1 + r[2] * 0.12; return {x: C[0] + r[0] * L * s, y: C[1] - r[1] * L * s, z: r[2], s}; };
+  const items = [];
+  bd.forEach((d, k) => items.push({z: proj(d).z, k, type: "atom", d}));
+  if ($("showlp").checked) lpd.forEach(d => items.push({z: proj(d).z * 0.6, type: "lp", d}));
+  items.push({z: 0, type: "center"});
+  items.sort((p, q) => p.z - q.z);
+  const ce = sp.atoms[0].el, o = proj([0, 0, 0]);
+  for (const it of items) {
+    if (it.type === "lp") {
+      const p = proj(it.d.map(x => x * 0.62)), r = 30 * p.s;
+      const gr = g.createRadialGradient(p.x, p.y, 2, p.x, p.y, r); gr.addColorStop(0, "rgba(147,197,253,.75)"); gr.addColorStop(1, "rgba(147,197,253,.05)");
+      g.fillStyle = gr; g.beginPath(); g.ellipse(p.x, p.y, r, r * 0.75, Math.atan2(p.y - o.y, p.x - o.x), 0, 6.283); g.fill();
+      g.fillStyle = "#1d4ed8"; for (const s2 of [-4, 4]) { g.beginPath(); g.arc(p.x + s2, p.y, 2.6, 0, 6.283); g.fill(); }
+    } else if (it.type === "atom") {
+      const p = proj(it.d), t = sp.atoms[it.k + 1].el;
+      g.strokeStyle = "#64748b"; g.lineWidth = 7 * p.s; g.lineCap = "round"; g.beginPath(); g.moveTo(o.x, o.y); g.lineTo(p.x, p.y); g.stroke();
+      if ($("showdip").checked) {
+        const dEN = EN[t] - EN[ce];
+        if (Math.abs(dEN) > 0.05) {
+          const from = dEN > 0 ? 0.25 : 0.75, to = dEN > 0 ? 0.75 : 0.25, a = proj(it.d.map(x => x * from)), b2 = proj(it.d.map(x => x * to));
+          g.strokeStyle = "#db2777"; g.lineWidth = 2.5; g.beginPath(); g.moveTo(a.x, a.y - 10); g.lineTo(b2.x, b2.y - 10); g.stroke();
+          const ang = Math.atan2(b2.y - a.y, b2.x - a.x); g.beginPath(); g.moveTo(b2.x, b2.y - 10); g.lineTo(b2.x - 9 * Math.cos(ang - 0.45), b2.y - 10 - 9 * Math.sin(ang - 0.45)); g.lineTo(b2.x - 9 * Math.cos(ang + 0.45), b2.y - 10 - 9 * Math.sin(ang + 0.45)); g.closePath(); g.fillStyle = "#db2777"; g.fill();
+        }
+      }
+      const r = (t === "H" ? 15 : 22) * p.s, gr = g.createRadialGradient(p.x - r / 3, p.y - r / 3, 2, p.x, p.y, r);
+      gr.addColorStop(0, "#fff"); gr.addColorStop(1, CPK[t]); g.fillStyle = gr; g.beginPath(); g.arc(p.x, p.y, r, 0, 6.283); g.fill(); g.strokeStyle = "rgba(0,0,0,.25)"; g.lineWidth = 1; g.stroke();
+      g.fillStyle = ["H", "F", "Cl", "S", "Be", "B"].includes(t) ? "#1f2937" : "#fff"; g.font = `bold ${Math.round(13 * p.s)}px Arial`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(t, p.x, p.y); g.textBaseline = "alphabetic";
+    } else {
+      const r = 27, gr = g.createRadialGradient(o.x - 9, o.y - 9, 2, o.x, o.y, r); gr.addColorStop(0, "#fff"); gr.addColorStop(1, CPK[ce]);
+      g.fillStyle = gr; g.beginPath(); g.arc(o.x, o.y, r, 0, 6.283); g.fill(); g.strokeStyle = "rgba(0,0,0,.25)"; g.stroke();
+      g.fillStyle = ["H", "F", "Cl", "S", "Be", "B"].includes(ce) ? "#1f2937" : "#fff"; g.font = "bold 15px Arial"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(ce, o.x, o.y); g.textBaseline = "alphabetic";
+    }
+  }
+  g.fillStyle = "#1f2937"; g.font = "bold 16px Arial"; g.textAlign = "left"; g.fillText(`${sp.name}: ${I.g[1]}`, 12, 24);
+}
+d3.addEventListener("pointerdown", ev => { dragging = {x: ev.clientX, y: ev.clientY}; d3.setPointerCapture(ev.pointerId); });
+d3.addEventListener("pointermove", ev => { if (!dragging) return; S.rot.a += (ev.clientX - dragging.x) * 0.01; S.rot.b = Math.max(-1.5, Math.min(1.5, S.rot.b + (ev.clientY - dragging.y) * 0.01)); dragging = {x: ev.clientX, y: ev.clientY}; });
+d3.addEventListener("pointerup", () => { dragging = null; });
+
+// ---------------------------------------------------------------- controls
+function fillSelect() {
+  const list = S.mode === "shape" ? SPECIES.filter(s => s.single) : SPECIES;
+  $("sp").innerHTML = list.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+  if (!list.includes(S.sp)) S.sp = list[0];
+  $("sp").value = S.sp.id;
+}
+$("sp").onchange = () => newSpecies(SPECIES.find(s => s.id === $("sp").value));
+$("b-rand").onclick = () => { const list = S.mode === "shape" ? SPECIES.filter(s => s.single) : SPECIES; let s; do { s = list[Math.floor(Math.random() * list.length)]; } while (s === S.sp); $("sp").value = s.id; newSpecies(s); };
+function setMode(m) {
+  S.mode = m;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m || s.id === "i-" + m);
+  const before = S.sp; fillSelect(); if (S.sp !== before || m === "build") newSpecies(S.sp); else shape();
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+
+// ---------------------------------------------------------------- tours
+const TOURS = {
+  build: [
+    ["#sp", "Choose a molecule or ion, or press Random. The atoms and how they are connected are already placed for you."],
+    ["#draw", "Tap a <b>bond</b> to make it double or triple. Tap an <b>atom</b> to add a lone pair. The counter shows how many valence electrons you have placed."],
+    ["#ctl", "Turn on formal charges or electron counts while you work. Press <b>Check</b> when you think it is right."],
+    ["#infocard", "How to count the valence electrons, what is wrong (or right) with your structure, and how many resonance structures there are."]
+  ],
+  shape: [
+    ["#d3", "The 3D shape predicted by VSEPR from the best Lewis structure. Drag to turn it. Blue clouds are lone pairs; pink arrows are bond dipoles."],
+    ["#infocard", "Electron domains, electron-domain and molecular geometry, bond angle, hybridization and polarity."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-lewis-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {build: "Build", shape: "3D shape"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
+// ---------------------------------------------------------------- run
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.mode === "shape") { if ($("spin").checked && !dragging) S.rot.a += dt * 0.5; draw3D(); }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const s = q.get("species"); const f = s && SPECIES.find(x => x.id.toLowerCase() === s.toLowerCase()); if (f) S.sp = f;
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "shape" ? "shape" : "build");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>
