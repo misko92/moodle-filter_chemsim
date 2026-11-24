@@ -24,9 +24,9 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2026112407;
+$plugin->version   = 2026112500;
 $plugin->requires  = 2026041000;
 $plugin->supported = [502, 503];
 $plugin->component = 'filter_chemsim';
 $plugin->maturity  = MATURITY_BETA;
-$plugin->release   = '0.4.0';
+$plugin->release   = '0.5.0';
