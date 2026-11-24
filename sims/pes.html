@@ -60,6 +60,13 @@ canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line
 .readout { font-family: Menlo, Consolas, monospace; font-size: 14px; margin-top: 8px; line-height: 1.5; }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 14px; margin-top: 6px; }
 @media (max-width: 640px) { body { padding: 8px 10px 20px; } .tabs button { padding: 8px 8px; font-size: 14px; } }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -69,6 +76,7 @@ canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line
   <button role="tab" data-mode="measure">How PES works</button>
   <button role="tab" data-mode="build">Build a spectrum</button>
   <button role="tab" data-mode="identify">Identify the element</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
 </nav>
 
 <!-- ============================== EXPLORE ============================== -->
@@ -115,7 +123,7 @@ canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line
   </div>
   <div class="readout" id="ms-readout"></div>
   <svg id="ms-chart" class="chart" viewBox="0 0 740 352" aria-label="Spectrum built from counted electrons"></svg>
-  <div class="note">Idealized: every electron is equally likely to be knocked out, and the photon energy is 500 MJ/mol (X-rays), enough to remove any electron in these atoms. Numbers above the peaks are the electrons counted so far.</div>
+  <div class="note">Idealized: every electron is equally likely to be knocked out, and the photon energy is 500 MJ/mol (1500 MJ/mol for Sc, Fe and Zn): X-rays with enough energy to remove any electron in these atoms. Numbers above the peaks are the electrons counted so far.</div>
 </section>
 
 <!-- ============================== BUILD ============================== -->
@@ -668,12 +676,100 @@ function idInit() {
   idNew();
 }
 
+// ================================================================= first-visit tours
+const TOURS = {
+  explore: [
+    ["#m-explore .col-atom .card", "This is the atom: protons in the nucleus, electrons in shells, colored by subshell. Press <b>Add proton + electron</b> to build the next element."],
+    ["#ex-chart", "This is its photoelectron spectrum. Each peak is one subshell: the <b>height</b> is how many electrons it has, the <b>position</b> is how much energy it takes to remove them. Energy increases to the <b>left</b>."],
+    ["#ex-info", "Tap any peak on the chart and the explanation for it appears here: why it sits where it does, and how it compares with the element before."],
+    ["#ex-picker", "Or jump straight to any element. The d-block row has iron and the Fe²⁺ ion."],
+    ["#ex-compare", "<b>Compare with</b> draws another element as a dashed outline, so you can see how the peaks move."]
+  ],
+  measure: [
+    ["#ms-canvas", "A spectrometer: X-ray photons (yellow) hit the atoms and knock electrons out. The detector measures each electron's kinetic energy."],
+    ["#ms-run", "Press <b>Run</b>. Use Slow first to follow single electrons, then Very fast."],
+    ["#ms-readout", "For every electron: <b>IE = hν − KE</b>. The more tightly an electron was held, the less kinetic energy it has left."],
+    ["#ms-chart", "Each counted electron adds to the peak for its subshell. After many counts the heights match the number of electrons in each subshell."]
+  ],
+  build: [
+    ["#bd-target", "You get an element. Write its electron configuration first: you need one peak for each occupied subshell."],
+    ["#m-build .col-chart .controls", "Add a peak for each subshell here."],
+    ["#bd-chart", "Drag a peak sideways to set its energy. Drag the round handle on top up or down to set its height (the number of electrons)."],
+    ["#bd-table", "Or fine-tune each peak here with the buttons."],
+    ["#bd-check", "Press <b>Check</b> for feedback. <b>Show answer</b> draws the real spectrum over yours, and <b>New element</b> gives you another one."]
+  ],
+  identify: [
+    ["#id-chart", "A mystery spectrum. Count the peaks and add up their heights: the total is the number of electrons."],
+    ["#id-picker", "Tap the element you think it is. If you are wrong, you are told why that element does not fit."],
+    ["#id-hint", "Stuck? Each hint is more specific than the last."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-pes-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode: tour shows again next time */ } }
+function tourStart(m) {
+  tourEnd(false);
+  if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els;
+  const de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const t = document.querySelector(sel), r = t.getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {explore: "Explore", measure: "How PES works", build: "Build a spectrum", identify: "Identify the element"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    // bring the highlighted part and the card into view (this also scrolls the Moodle page around an embedded frame)
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
 // ================================================================= tabs and URL options
 function setMode(m) {
-  for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
   for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
   if (m !== "measure") msStop();
   if (m === "measure") msDraw();
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 350);
 }
 (function init() {
   legend(); exInit(); msInit(); bdInit(); idInit();
@@ -684,8 +780,10 @@ function setMode(m) {
   else bdNew("Na");
   if (q.get("compare")) $("ex-compare").value = q.get("compare");
   ex.el = el && D[el] ? el : "Na"; ex.shown = peaksOf(ex.el); exSet(ex.el);
+  if (q.get("tour") === "0") tour.auto = false;
+  $("tour-btn").onclick = () => tourStart(document.querySelector('.tabs button[aria-selected="true"]').dataset.mode);
   if (q.get("tabs") === "0") { $("tabs").style.display = "none"; $("title").style.display = "none"; }
-  for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => setMode(b.dataset.mode);
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
   setMode(["explore", "measure", "build", "identify"].includes(mode) ? mode : "explore");
 })();
 // tell an embedding page (filter_chemsim) how tall we are

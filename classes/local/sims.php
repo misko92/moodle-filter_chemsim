@@ -29,7 +29,7 @@ namespace filter_chemsim\local;
 class sims {
     /** @var array name => [file, starting height in px, allowed options] */
     private const SIMS = [
-        'pes' => ['file' => 'pes.html', 'height' => 1150, 'options' => ['mode', 'el', 'compare', 'tabs']],
+        'pes' => ['file' => 'pes.html', 'height' => 1150, 'options' => ['mode', 'el', 'compare', 'tabs', 'tour']],
         'equilibrium' => ['file' => 'equilibrium.html', 'height' => 1000, 'options' => ['predict', 'title']],
     ];
 
