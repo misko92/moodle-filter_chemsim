@@ -7,6 +7,8 @@ Embeds interactive chemistry simulations anywhere Moodle shows formatted text
     [chemsim pes mode=build el=Fe]
     [chemsim pes mode=identify tabs=0]
     [chemsim equilibrium predict=1]
+    [chemsim boltzmann]
+    [chemsim boltzmann mode=energy]
     [chemsim solubility salt=PbI2]
     [chemsim solubility mode=mix]
 
@@ -22,6 +24,7 @@ resizes itself to fit; an "Open full screen" link opens it on its own.
 | Name | What it is | Options |
 |---|---|---|
 | `pes` | Photoelectron spectroscopy: explore, how PES works, build a spectrum, identify the element (H–Ca, plus Sc, Fe, Zn, Fe²⁺) | `mode` = explore / measure / build / identify; `el` = element symbol (`Fe2+` for the ion); `compare` = element, `prev`, `next` or `none`; `tabs=0` hides the tabs; `tour=0` stops the first-visit tour from starting by itself (the ? button still shows it) |
+| `boltzmann` | Maxwell–Boltzmann: speed distribution of a colliding gas (temperature, He/N₂/CO₂/Xe, He + Xe mixture, same-speed start) and the kinetic-energy distribution with a draggable E<sub>a</sub>, catalyst and temperature comparison | `mode` = speed / energy; `gas` = He, N2, CO2, Xe or mix; `title=0`; `tour=0` |
 | `equilibrium` | 2 NO₂ ⇌ N₂O₄ particle box: Le Chatelier changes, Q vs K, forward/reverse rates | `predict=1` turns on "predict first"; `title=0` hides the heading; `tour=0` stops the first-visit tour starting by itself |
 | `solubility` | Saturated solutions and K<sub>sp</sub> (AgCl, PbI₂, Mg(OH)₂): adding solid or water, evaporating, common ion, acid; plus a "will it precipitate?" mixing tab | `mode` = sat / mix; `salt` = AgCl, PbI2 or MgOH2; `predict=1`; `title=0`; `tour=0` |
 

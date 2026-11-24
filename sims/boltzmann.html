@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maxwell-Boltzmann</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type=range] { flex: 1 1 160px; height: 32px; min-width: 140px; }
+.val { font-weight: bold; min-width: 5.5em; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+.grad { display: inline-block; width: 70px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #2563eb, #22c55e, #f59e0b, #dc2626); vertical-align: 0; margin: 0 4px; }
+table.stats { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+table.stats td, table.stats th { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+table.stats th { font-size: 12px; color: var(--muted); font-weight: normal; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 16px; line-height: 1.5; margin-top: 8px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.mode { display: none; } .mode.active { display: block; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Maxwell–Boltzmann Distribution</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="speed">Speed distribution</button>
+  <button data-mode="energy">Activation energy</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 480px">
+    <canvas id="box" width="520" height="300" aria-label="Gas molecules moving and colliding in a container"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="ctl" id="ctl">
+      <b>Temperature</b>
+      <div><input type="range" id="temp" min="100" max="1000" step="25" value="300"><span class="val" id="tempv"></span></div>
+      <b class="sp">Gas</b>
+      <div class="sp"><select id="gas"></select></div>
+      <b class="en">E<sub>a</sub></b>
+      <div class="en"><input type="range" id="ea" min="4" max="16" step="0.5" value="10"><span class="val" id="eav"></span></div>
+      <b></b>
+      <div><button id="b-same" class="sp">Give every molecule the same speed</button><label class="chk en"><input type="checkbox" id="cat"> Add a catalyst</label>
+        <button id="b-pause">❚❚ Pause</button></div>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1 1 480px">
+    <h2 id="gtitle"></h2>
+    <canvas id="graph" width="520" height="300" aria-label="Histogram of molecular speeds or energies with the Maxwell-Boltzmann curve"></canvas>
+    <div class="legend" id="glegend"></div>
+    <section class="mode" id="m-speed"><table class="stats" id="stats"></table></section>
+    <section class="mode" id="m-energy"><div class="big" id="frac"></div></section>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note" id="foot"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const R = 8.314;
+// ---------------------------------------------------------------- gases (molar mass in kg/mol)
+const GASES = {He: {f: "He", M: 0.004003, col: "#0ea5e9"}, N2: {f: "N₂", M: 0.02802, col: "#6366f1"}, CO2: {f: "CO₂", M: 0.04401, col: "#64748b"},
+  Xe: {f: "Xe", M: 0.1313, col: "#a855f7"}, mix: {f: "He + Xe mixture"}};
+const vmp = (M, T) => Math.sqrt(2 * R * T / M), vavg = (M, T) => Math.sqrt(8 * R * T / (Math.PI * M)), vrms = (M, T) => Math.sqrt(3 * R * T / M);
+const fSpeed = (v, M, T) => { const a = M / (2 * R * T); return 4 * Math.PI * Math.pow(a / Math.PI, 1.5) * v * v * Math.exp(-a * v * v); };   // per (m/s)
+const fEnergy = (E, T) => { const rt = R * T / 1000; return 2 * Math.sqrt(E / Math.PI) * Math.pow(1 / rt, 1.5) * Math.exp(-E / rt); };      // E in kJ/mol
+function erfc(x) { const t = 1 / (1 + 0.3275911 * x); return t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-x * x); }
+const fracAbove = (Ea, T) => { const x = Ea / (R * T / 1000); return 2 * Math.sqrt(x / Math.PI) * Math.exp(-x) + erfc(Math.sqrt(x)); };
+
+// ---------------------------------------------------------------- state
+const N = 260, W = 520, H = 300, DEPTH = 300, SCALE = 0.12;   // px per (m/s), so 500 m/s moves 60 px/s
+const S = {mode: "speed", gas: "N2", T: 300, Tprev: null, Ea: 10, cat: false, paused: false, parts: [], hist: null, histE: null, fx: [], tScale: 1, msg: ""};
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function makeParts() {
+  S.parts = [];
+  const gl = S.mode === "energy" ? ["N2"] : S.gas === "mix" ? ["He", "Xe"] : [S.gas];
+  for (let i = 0; i < N; i++) {
+    const g = gl[i % gl.length], M = GASES[g].M, sd = Math.sqrt(R * S.T / M);
+    S.parts.push({g, M, x: rnd(8, W - 8), y: rnd(8, H - 8), z: rnd(0, DEPTH), vx: sd * gauss(), vy: sd * gauss(), vz: sd * gauss()});
+  }
+  resetHist();
+}
+const speed = p => Math.hypot(p.vx, p.vy, p.vz);
+const ke = p => 0.5 * p.M * (p.vx * p.vx + p.vy * p.vy + p.vz * p.vz) / 1000;   // kJ/mol
+function measuredT() { let k = 0; for (const p of S.parts) k += ke(p); return (k / S.parts.length) * 1000 / (1.5 * R); }
+
+// ---------------------------------------------------------------- dynamics: walls + collisions between nearby molecules
+function step(dt) {
+  // gentle thermostat toward the set temperature (only active right after a change)
+  const Tm = measuredT();
+  if (Math.abs(Tm / S.T - 1) > 0.002 && S.tScale) { const f = Math.pow(S.T / Tm, 0.5 * Math.min(1, dt / 0.35)); for (const p of S.parts) { p.vx *= f; p.vy *= f; p.vz *= f; } }
+  for (const p of S.parts) {
+    p.x += p.vx * SCALE * dt; p.y += p.vy * SCALE * dt; p.z += p.vz * SCALE * dt;
+    if (p.x < 6) { p.x = 6; p.vx = Math.abs(p.vx); } if (p.x > W - 6) { p.x = W - 6; p.vx = -Math.abs(p.vx); }
+    if (p.y < 6) { p.y = 6; p.vy = Math.abs(p.vy); } if (p.y > H - 6) { p.y = H - 6; p.vy = -Math.abs(p.vy); }
+    if (p.z < 0) { p.z = 0; p.vz = Math.abs(p.vz); } if (p.z > DEPTH) { p.z = DEPTH; p.vz = -Math.abs(p.vz); }
+  }
+  // about 2.5 collisions per molecule per second: pick a molecule, collide it with its nearest neighbour
+  let nc = 2.5 * N * dt / 2, k = Math.floor(nc) + (Math.random() < nc % 1 ? 1 : 0);
+  while (k-- > 0) {
+    const a = S.parts[Math.floor(Math.random() * N)];
+    let b = null, bd = 1e9;
+    for (const q of S.parts) if (q !== a) { const d = (q.x - a.x) ** 2 + (q.y - a.y) ** 2 + (q.z - a.z) ** 2; if (d < bd) { bd = d; b = q; } }
+    collide(a, b);
+    if (S.fx.length < 30) S.fx.push({x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, t: 1});
+  }
+  for (const f of S.fx) f.t -= dt * 3;
+  S.fx = S.fx.filter(f => f.t > 0);
+  accumulate(dt);
+}
+function collide(a, b) {   // elastic: momentum and energy conserved, new direction random (hard spheres, averaged over impact)
+  const mt = a.M + b.M, cx = (a.M * a.vx + b.M * b.vx) / mt, cy = (a.M * a.vy + b.M * b.vy) / mt, cz = (a.M * a.vz + b.M * b.vz) / mt;
+  const g = Math.hypot(a.vx - b.vx, a.vy - b.vy, a.vz - b.vz);
+  const ct = rnd(-1, 1), st = Math.sqrt(1 - ct * ct), ph = rnd(0, 2 * Math.PI), nx = st * Math.cos(ph), ny = st * Math.sin(ph), nz = ct;
+  a.vx = cx + b.M / mt * g * nx; a.vy = cy + b.M / mt * g * ny; a.vz = cz + b.M / mt * g * nz;
+  b.vx = cx - a.M / mt * g * nx; b.vy = cy - a.M / mt * g * ny; b.vz = cz - a.M / mt * g * nz;
+}
+
+// ---------------------------------------------------------------- histograms (time-averaged so they are not too jumpy)
+const NB = 30;
+const EMAX = 20;   // kJ/mol axis for the energy tab
+function vAxisMax() { const M = S.gas === "mix" ? GASES.He.M : GASES[S.gas].M, v = 2.4 * vmp(M, 1000); const st = v > 3000 ? 1000 : 250; return Math.ceil(v / st) * st; }
+function resetHist() { S.hist = {He: new Array(NB).fill(0), N2: new Array(NB).fill(0), CO2: new Array(NB).fill(0), Xe: new Array(NB).fill(0)}; S.histE = new Array(NB).fill(0); S.histFresh = true; }
+function accumulate(dt) {
+  const vmax = vAxisMax(), k = S.histFresh ? 1 : Math.min(1, dt / 0.8);
+  S.histFresh = false;
+  const now = {He: new Array(NB).fill(0), N2: new Array(NB).fill(0), CO2: new Array(NB).fill(0), Xe: new Array(NB).fill(0)}, nowE = new Array(NB).fill(0);
+  for (const p of S.parts) {
+    const i = Math.floor(speed(p) / vmax * NB); if (i < NB) now[p.g][i]++;
+    const j = Math.floor(ke(p) / EMAX * NB); if (j < NB) nowE[j]++;
+  }
+  for (const g in now) for (let i = 0; i < NB; i++) S.hist[g][i] += (now[g][i] - S.hist[g][i]) * k;
+  for (let i = 0; i < NB; i++) S.histE[i] += (nowE[i] - S.histE[i]) * k;
+}
+
+// ---------------------------------------------------------------- drawing
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, W, H); hiDPI(graph, 520, 300);
+function speedColour(t) {   // t = 0 (slow) .. 1 (fast)
+  const stops = [[37, 99, 235], [34, 197, 94], [245, 158, 11], [220, 38, 38]], u = Math.max(0, Math.min(0.999, t)) * 3, i = Math.floor(u), f = u - i;
+  const c = stops[i].map((v, k) => Math.round(v + (stops[i + 1][k] - v) * f)); return `rgb(${c})`;
+}
+const eaNow = () => S.cat ? S.Ea * 0.6 : S.Ea;
+function drawBox() {
+  const g = bg; g.clearRect(0, 0, W, H);
+  const warm = (S.T - 100) / 900;
+  g.fillStyle = `rgb(${Math.round(248 + 7 * warm)},${Math.round(250 - 20 * warm)},${Math.round(252 - 40 * warm)})`; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "#475569"; g.lineWidth = 3; g.strokeRect(1.5, 1.5, W - 3, H - 3);
+  for (const f of S.fx) { g.beginPath(); g.arc(f.x, f.y, 8 + 6 * (1 - f.t), 0, 6.283); g.strokeStyle = `rgba(148,163,184,${f.t * 0.6})`; g.lineWidth = 1.5; g.stroke(); }
+  const sorted = S.parts.slice().sort((a, b) => b.z - a.z), ea = eaNow();
+  for (const p of sorted) {
+    const r = (p.g === "He" ? 3.2 : p.g === "Xe" ? 5.5 : 4.5) * (1.15 - 0.35 * p.z / DEPTH);
+    let col;
+    if (S.mode === "energy") col = ke(p) >= ea ? "#f97316" : "#94a3b8";
+    else if (S.gas === "mix") col = GASES[p.g].col;
+    else col = speedColour(speed(p) / (2.2 * vmp(p.M, S.T)));
+    if (S.mode === "energy" && ke(p) >= ea) { g.beginPath(); g.arc(p.x, p.y, r + 5, 0, 6.283); g.fillStyle = "rgba(249,115,22,.25)"; g.fill(); }
+    g.beginPath(); g.arc(p.x, p.y, r, 0, 6.283); g.fillStyle = col; g.fill();
+  }
+  g.fillStyle = "#334155"; g.font = "13px Arial"; g.fillText(`${S.T} K`, 10, 20);
+  if (S.paused) { g.font = "bold 15px Arial"; g.fillText("Paused", 10, 40); }
+}
+function niceY(v) { for (const s of [5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150, 200]) if (v <= s) return s; return Math.ceil(v / 50) * 50; }
+const GX0 = 52, GX1 = 510, GY0 = 14, GY1 = 250;
+function axes(g, xmax, ymax, xlabel, xfmt) {
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial";
+  const Y = c => GY1 - c / ymax * (GY1 - GY0);
+  g.textAlign = "right";
+  for (let i = 0; i <= 4; i++) { const c = ymax * i / 4, y = Y(c); g.beginPath(); g.moveTo(GX0, y); g.lineTo(GX1, y); g.stroke(); g.fillText(Math.round(c), GX0 - 5, y + 4); }
+  g.textAlign = "center";
+  for (let i = 0; i <= 5; i++) { const v = xmax * i / 5, x = GX0 + (GX1 - GX0) * i / 5; g.fillText(xfmt(v), x, GY1 + 15); }
+  g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText(xlabel, (GX0 + GX1) / 2, GY1 + 36);
+  g.save(); g.translate(14, (GY0 + GY1) / 2); g.rotate(-Math.PI / 2); g.fillText("Number of molecules", 0, 0); g.restore();
+}
+function curve(g, xmax, ymax, fn, col, dashed, width) {
+  g.strokeStyle = col; g.lineWidth = width || 2.5; g.setLineDash(dashed ? [6, 4] : []); g.beginPath();
+  for (let i = 0; i <= 200; i++) { const x = xmax * i / 200, y = GY1 - Math.min(ymax * 1.05, fn(x)) / ymax * (GY1 - GY0), px = GX0 + (GX1 - GX0) * i / 200; i ? g.lineTo(px, y) : g.moveTo(px, y); }
+  g.stroke(); g.setLineDash([]);
+}
+function drawGraph() {
+  const g = gg; g.clearRect(0, 0, 520, 300);
+  if (S.mode === "speed") {
+    const vmax = vAxisMax(), bw = vmax / NB, gl = S.gas === "mix" ? ["He", "Xe"] : [S.gas], per = N / gl.length;
+    let peak = 0;
+    for (const k of gl) for (const T of [S.T, S.Tprev].filter(Boolean)) peak = Math.max(peak, per * bw * fSpeed(vmp(GASES[k].M, T), GASES[k].M, T));
+    const ymax = niceY(peak * 1.15);
+    axes(g, vmax, ymax, "Molecular speed (m/s)", v => Math.round(v));
+    for (const k of gl) {
+      const col = S.gas === "mix" ? GASES[k].col : "#93c5fd";
+      g.fillStyle = col; g.globalAlpha = S.gas === "mix" ? 0.35 : 0.7;
+      for (let i = 0; i < NB; i++) { const x = GX0 + (GX1 - GX0) * i / NB, w = (GX1 - GX0) / NB - 1, h = Math.min(S.hist[k][i], ymax * 1.05) / ymax * (GY1 - GY0); g.fillRect(x, GY1 - h, w, h); }
+      g.globalAlpha = 1;
+    }
+    for (const k of gl) {
+      const M = GASES[k].M, col = S.gas === "mix" ? GASES[k].col : "#1d4ed8";
+      if (S.Tprev) curve(g, vmax, ymax, v => per * bw * fSpeed(v, M, S.Tprev), "#64748b", true, 2);
+      curve(g, vmax, ymax, v => per * bw * fSpeed(v, M, S.T), col, false);
+    }
+  } else {
+    const bw = EMAX / NB, Tlow = Math.min(S.T, S.Tprev || S.T), ymax = niceY(N * bw * fEnergy(R * Tlow / 2000, Tlow) * 1.15);   // peak of the curve is at E = RT/2
+    axes(g, EMAX, ymax, "Kinetic energy (kJ/mol)", v => Math.round(v));
+    // shaded area beyond Ea under the current curve
+    const ea = eaNow(), X = E => GX0 + (GX1 - GX0) * E / EMAX, Y = c => GY1 - Math.min(ymax * 1.05, c) / ymax * (GY1 - GY0);
+    g.fillStyle = "rgba(249,115,22,.28)"; g.beginPath(); g.moveTo(X(ea), GY1);
+    for (let E = ea; E <= EMAX; E += 0.1) g.lineTo(X(E), Y(N * bw * fEnergy(E, S.T)));
+    g.lineTo(X(EMAX), GY1); g.closePath(); g.fill();
+    g.fillStyle = "#cbd5e1"; g.globalAlpha = 0.8;
+    for (let i = 0; i < NB; i++) { const x = GX0 + (GX1 - GX0) * i / NB, w = (GX1 - GX0) / NB - 1, h = Math.min(S.histE[i], ymax * 1.05) / ymax * (GY1 - GY0); g.fillRect(x, GY1 - h, w, h); }
+    g.globalAlpha = 1;
+    if (S.Tprev) curve(g, EMAX, ymax, E => N * bw * fEnergy(E, S.Tprev), "#64748b", true, 2);
+    curve(g, EMAX, ymax, E => N * bw * fEnergy(E, S.T), "#1d4ed8", false);
+    // Ea lines
+    const line = (E, col, dash, label) => { g.strokeStyle = col; g.lineWidth = 2.5; g.setLineDash(dash ? [6, 4] : []); g.beginPath(); g.moveTo(X(E), GY0); g.lineTo(X(E), GY1); g.stroke(); g.setLineDash([]);
+      g.fillStyle = col; g.font = "bold 12px Arial"; g.textAlign = "left"; g.fillText(label, X(E) + 4, GY0 + 12); };
+    if (S.cat) line(S.Ea, "#9ca3af", true, "Eₐ (no catalyst)");
+    line(ea, "#c2410c", false, S.cat ? "Eₐ (catalyst)" : "Eₐ  ⇆ drag");
+    // label the shaded tail with its percentage
+    const lx = Math.min(GX1 - 30, X(ea) + 34), ly = Math.min(GY1 - 18, Y(N * bw * fEnergy(Math.min(EMAX, ea + 1.5), S.T)) - 10);
+    g.fillStyle = "#9a3412"; g.font = "bold 14px Arial"; g.textAlign = "center"; g.fillText(fmtPct(fracAbove(ea, S.T)), lx, ly);
+  }
+}
+function drawPanel() {
+  if (S.mode === "speed") {
+    const gl = S.gas === "mix" ? ["He", "Xe"] : [S.gas];
+    const rows = gl.map(k => {
+      const M = GASES[k].M, ps = S.parts.filter(p => p.g === k), avs = ps.reduce((t, p) => t + speed(p), 0) / ps.length, ake = ps.reduce((t, p) => t + ke(p), 0) / ps.length;
+      return `<tr><td><b style="color:${S.gas === "mix" ? GASES[k].col : "inherit"}">${GASES[k].f}</b> (${(M * 1000).toFixed(1)} g/mol)</td><td>${Math.round(vmp(M, S.T))}</td><td>${Math.round(avs)}</td><td>${ake.toFixed(2)}</td></tr>`;
+    });
+    $("stats").innerHTML = `<tr><th>Gas</th><th>Most probable speed (m/s)</th><th>Average speed now (m/s)</th><th>Average KE now (kJ/mol)</th></tr>` + rows.join("") +
+      `<tr><td colspan="4" class="note" style="border:0">At ${S.T} K the average kinetic energy of <b>any</b> gas is (3/2)RT = ${(1.5 * R * S.T / 1000).toFixed(2)} kJ/mol.</td></tr>`;
+  } else {
+    const ea = eaNow(), f = fracAbove(ea, S.T), cnt = S.parts.filter(p => ke(p) >= ea).length;
+    let h = `Molecules with KE ≥ E<sub>a</sub> (${ea.toFixed(1)} kJ/mol) at ${S.T} K: <b>${fmtPct(f)}</b> &nbsp;<span style="color:var(--muted);font-size:14px">(${cnt} of ${N} in the box right now)</span>`;
+    if (S.Tprev) { const f0 = fracAbove(ea, S.Tprev); const r = f / f0; h += `<br>At ${S.Tprev} K (dashed): ${fmtPct(f0)}. &nbsp;` + (r >= 1 ? `That is <b>${r.toFixed(1)} times</b> as many molecules able to react.` : `Now only <b>1/${(1 / r).toFixed(1)}</b> as many molecules can react.`); }
+    if (S.cat) { const f0 = fracAbove(S.Ea, S.T); h += `<br>Without the catalyst: ${fmtPct(f0)}. The catalyst gives <b>${(f / f0).toFixed(1)} times</b> as many.`; }
+    $("frac").innerHTML = h;
+  }
+}
+const fmtPct = f => f >= 0.1 ? (100 * f).toFixed(0) + "%" : f >= 0.001 ? (100 * f).toFixed(1) + "%" : (100 * f).toPrecision(2) + "%";
+
+// ---------------------------------------------------------------- explanations
+function explain(kind, extra) {
+  const W = {
+    start: S.mode === "speed"
+      ? "The molecules all have different speeds, and they keep changing as the molecules collide. The bars count how many molecules have each speed right now; the curve is the Maxwell–Boltzmann distribution predicted for this temperature."
+      : "This curve shows the kinetic energies of the molecules. Only molecules with at least the activation energy, E<sub>a</sub> (the shaded tail, glowing orange in the box), collide hard enough to react.",
+    hotter: S.mode === "speed"
+      ? "Higher temperature: the average kinetic energy is higher, so the molecules move faster on average. The curve <b>shifts right and gets flatter and wider</b> (the area stays the same, because the number of molecules is the same)."
+      : "Higher temperature: the curve shifts right and flattens, so a much larger fraction of molecules has at least E<sub>a</sub>. That is why a small temperature increase can make a reaction <b>much faster</b>.",
+    colder: S.mode === "speed"
+      ? "Lower temperature: lower average kinetic energy, so the curve <b>shifts left and gets taller and narrower</b>. Most molecules have speeds close to the most probable speed."
+      : "Lower temperature: fewer molecules in the tail beyond E<sub>a</sub>, so fewer collisions have enough energy and the reaction is slower.",
+    gas: "Same temperature, so every gas has the <b>same average kinetic energy</b>. Lighter molecules must move faster to have that energy (KE = ½mv²): their curve is wider and further right; heavier molecules are slower, with a taller, narrower curve.",
+    mix: "Helium (4 g/mol) and xenon (131 g/mol) at the same temperature: the <b>same average kinetic energy</b> (see the table), but very different speeds. Each xenon atom is heavy and slow; each helium atom is light and fast.",
+    same: "Every molecule started with the <b>same speed</b>. Collisions transfer energy: in each collision one molecule usually speeds up and the other slows down. Within a few seconds the speeds spread out into the Maxwell–Boltzmann distribution, and the total energy has not changed.",
+    ea: "Higher E<sub>a</sub>: a smaller fraction of molecules has enough energy, so the reaction is slower. Lower E<sub>a</sub>: a larger fraction, so it is faster.",
+    cat: S.cat
+      ? "A catalyst provides a different pathway with a <b>lower activation energy</b>. The curve does not change (same temperature), but many more molecules now have enough energy to react."
+      : "Without the catalyst the activation energy is back to its original value, and fewer molecules have enough energy."
+  };
+  $("why").innerHTML = W[kind] + (extra || "");
+}
+
+// ---------------------------------------------------------------- controls
+$("gas").innerHTML = Object.keys(GASES).map(k => `<option value="${k}">${k === "mix" ? GASES[k].f : GASES[k].f + " (" + (GASES[k].M * 1000).toFixed(GASES[k].M < .01 ? 1 : 0) + " g/mol)"}</option>`).join("");
+$("gas").value = S.gas;
+function setT(T, prev) {
+  if (T === S.T) return;
+  S.Tprev = prev != null ? prev : S.T; S.T = T; panelT = 0; $("tempv").textContent = `${T} K (${T - 273} °C)`;
+  explain(T > S.Tprev ? "hotter" : "colder", ` <span style="color:var(--muted)">The dashed curve is ${S.Tprev} K.</span>`); legend();
+}
+let tDrag = null;
+$("temp").addEventListener("input", e => { if (tDrag == null) tDrag = S.T; const T = +e.target.value; S.T = T; $("tempv").textContent = `${T} K (${T - 273} °C)`; legend(); });
+$("temp").addEventListener("change", e => { const from = tDrag != null ? tDrag : S.T; tDrag = null; const T = +e.target.value; S.T = from; setT(T, from); });
+$("gas").onchange = () => { S.gas = $("gas").value; S.Tprev = null; makeParts(); explain(S.gas === "mix" ? "mix" : "gas"); legend(); };
+$("b-same").onclick = () => {
+  for (const p of S.parts) { const v = vrms(p.M, S.T), ct = rnd(-1, 1), st = Math.sqrt(1 - ct * ct), ph = rnd(0, 6.283); p.vx = v * st * Math.cos(ph); p.vy = v * st * Math.sin(ph); p.vz = v * ct; }
+  resetHist(); explain("same");
+};
+$("b-pause").onclick = () => { S.paused = !S.paused; $("b-pause").textContent = S.paused ? "▶ Run" : "❚❚ Pause"; };
+$("ea").addEventListener("input", e => { S.Ea = +e.target.value; $("eav").textContent = `${S.Ea.toFixed(1)} kJ/mol`; explain("ea"); });
+$("cat").onchange = () => { S.cat = $("cat").checked; explain("cat"); };
+// drag the Ea line on the graph
+function gPoint(ev) { const r = graph.getBoundingClientRect(); return {x: (ev.clientX - r.left) / r.width * 520, y: (ev.clientY - r.top) / r.height * 300}; }
+let eaDrag = false;
+graph.addEventListener("pointerdown", ev => {
+  if (S.mode !== "energy") return;
+  const p = gPoint(ev), x = GX0 + (GX1 - GX0) * eaNow() / EMAX;
+  if (Math.abs(p.x - x) < 22) { eaDrag = true; graph.setPointerCapture(ev.pointerId); ev.preventDefault(); }
+});
+graph.addEventListener("pointermove", ev => {
+  if (!eaDrag) return;
+  const p = gPoint(ev); let E = (p.x - GX0) / (GX1 - GX0) * EMAX; if (S.cat) E /= 0.6;
+  S.Ea = Math.max(4, Math.min(16, Math.round(E * 2) / 2)); $("ea").value = S.Ea; $("eav").textContent = `${S.Ea.toFixed(1)} kJ/mol`; explain("ea");
+});
+graph.addEventListener("pointerup", () => { eaDrag = false; });
+function legend() {
+  if (S.mode === "energy") $("legend").innerHTML = `<span><span class="dot" style="background:#f97316"></span>enough energy to react (KE ≥ E<sub>a</sub>)</span><span><span class="dot" style="background:#94a3b8"></span>not enough</span>`;
+  else if (S.gas === "mix") $("legend").innerHTML = `<span><span class="dot" style="background:${GASES.He.col}"></span>He</span><span><span class="dot" style="background:${GASES.Xe.col}"></span>Xe</span>`;
+  else $("legend").innerHTML = `<span>Color shows speed: slow<span class="grad"></span>fast</span>`;
+  $("glegend").innerHTML = S.mode === "speed"
+    ? `<span>bars: molecules in the box</span><span>solid curve: Maxwell–Boltzmann at ${S.T} K</span>${S.Tprev ? `<span>dashed: ${S.Tprev} K</span>` : ""}`
+    : `<span>bars: molecules in the box</span><span>shaded: KE ≥ E<sub>a</sub></span>${S.Tprev ? `<span>dashed: ${S.Tprev} K</span>` : ""}`;
+  $("gtitle").textContent = S.mode === "speed" ? "Distribution of molecular speeds" : "Distribution of kinetic energies";
+}
+function setMode(m) {
+  S.mode = m; S.Tprev = null;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  for (const e of document.querySelectorAll(".sp")) e.style.display = m === "speed" ? "" : "none";
+  for (const e of document.querySelectorAll(".en")) e.style.display = m === "energy" ? "" : "none";
+  const range = m === "speed" ? [100, 1000, 25] : [200, 600, 10];
+  Object.assign($("temp"), {min: range[0], max: range[1], step: range[2]});
+  S.T = 300; $("temp").value = S.T; $("tempv").textContent = `${S.T} K (${S.T - 273} °C)`;
+  $("foot").innerHTML = m === "speed"
+    ? "The molecules move in three dimensions (their depth shows in their size). The speeds are real: about 500 m/s for N₂ at room temperature. The animation slows them down by a factor of about 8,000."
+    : "The E<sub>a</sub> values here (4–16 kJ/mol) are smaller than for most real reactions (often 50–100 kJ/mol), so that some of the 260 molecules in the box are above E<sub>a</sub>. With a real E<sub>a</sub> the fraction is tiny, and the effect of temperature is even bigger. The kinetic-energy distribution is the same for every gas at a given temperature.";
+  makeParts(); legend(); explain("start");
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+
+// ---------------------------------------------------------------- first-visit tours
+const TOURS = {
+  speed: [
+    ["#box", "A container of gas molecules, moving and colliding. The color shows each molecule's speed. Each collision changes the speeds of both molecules."],
+    ["#graph", "The bars count how many molecules have each speed right now. The curve is the Maxwell–Boltzmann distribution for this temperature: the bars follow it."],
+    ["#ctl", "Change the temperature or the gas. The old curve stays as a dashed line so you can compare. Try <b>Give every molecule the same speed</b> and watch collisions spread the speeds out."],
+    ["#stats", "The most probable speed (the peak of the curve), the average speed and the average kinetic energy. Compare the average KE of different gases at the same temperature."]
+  ],
+  energy: [
+    ["#box", "Molecules with enough kinetic energy to react (at least E<sub>a</sub>) glow orange."],
+    ["#graph", "The kinetic-energy distribution. The shaded tail beyond the E<sub>a</sub> line is the fraction of molecules that can react. Drag the E<sub>a</sub> line, or use the slider."],
+    ["#ctl", "Raise the temperature a little, or add a catalyst, and see how the shaded fraction changes. The previous temperature stays dashed."],
+    ["#frac", "The fraction of molecules with at least E<sub>a</sub>, and how many times bigger it got. The reaction rate is proportional to it."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-mb-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {speed: "Speed distribution", energy: "Activation energy"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
+// ---------------------------------------------------------------- run
+let last = performance.now(), panelT = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!S.paused) step(dt);
+  drawBox(); drawGraph();
+  if ((panelT -= dt) <= 0) { panelT = 0.25; drawPanel(); }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const gas = q.get("gas"); if (gas && GASES[gas]) { S.gas = gas; $("gas").value = gas; }
+  $("eav").textContent = `${S.Ea.toFixed(1)} kJ/mol`;
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "energy" ? "energy" : "speed");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+</body>
+</html>

@@ -27,6 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 $string['filtername'] = 'Chemistry simulations';
 $string['openfull'] = 'Open full screen';
 $string['privacy:metadata'] = 'The Chemistry simulations filter does not store any personal data. The simulations run in the browser.';
+$string['sim_boltzmann'] = 'Maxwell-Boltzmann distribution';
 $string['sim_equilibrium'] = 'Equilibrium box: Le Chatelier\'s principle';
 $string['sim_pes'] = 'Photoelectron spectroscopy builder';
 $string['sim_solubility'] = 'Solubility box: Ksp';
