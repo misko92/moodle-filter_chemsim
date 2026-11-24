@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Integrated Rate Laws</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+select, input[type=text] { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+input[type=text] { width: 7em; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type=range] { flex: 1 1 160px; height: 32px; min-width: 140px; }
+.val { font-weight: bold; min-width: 7.5em; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.big { font-size: 15px; line-height: 1.5; margin-top: 8px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.ok { color: #047857; } .bad { color: #b91c1c; }
+details { margin-top: 8px; font-size: 14px; }
+summary { cursor: pointer; color: var(--accent); }
+table.stats { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 6px; }
+table.stats td, table.stats th { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: right; }
+table.stats th { font-size: 12px; color: var(--muted); font-weight: normal; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Integrated Rate Laws: A → products</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="explore">Explore</button>
+  <button data-mode="identify">Identify the order</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 460px" id="boxcard">
+    <canvas id="box" width="520" height="250" aria-label="Molecules of A turning into product"></canvas>
+    <div class="legend"><span><span class="dot" style="background:#2563eb"></span>A</span><span><span class="dot" style="background:#cbd5e1"></span>product</span></div>
+    <div class="ctl" id="ctl">
+      <b class="ex">Order</b>
+      <div class="ex"><button data-order="0">Zero</button><button data-order="1">First</button><button data-order="2">Second</button></div>
+      <b class="ex">[A]<sub>0</sub></b>
+      <div class="ex"><input type="range" id="a0" min="0.5" max="2" step="0.25" value="1"><span class="val" id="a0v"></span></div>
+      <b class="ex">k</b>
+      <div class="ex"><input type="range" id="k" min="0.01" max="0.1" step="0.005" value="0.04"><span class="val" id="kv"></span></div>
+      <b></b>
+      <div><button id="b-run" class="primary">▶ Start</button><button id="b-reset">↺ Reset</button><button id="b-new" class="id">New reaction</button></div>
+    </div>
+    <div class="big" id="readout"></div>
+    <section id="answer" class="id" style="margin-top:10px">
+      <div class="ctl" style="margin-top:0">
+        <b>Order</b>
+        <div><select id="q-order"><option value="">choose…</option><option value="0">zero order</option><option value="1">first order</option><option value="2">second order</option></select></div>
+        <b>k</b>
+        <div><input type="text" id="q-k" inputmode="decimal" placeholder="value"><select id="q-unit"><option value="">units…</option><option value="0">M/s</option><option value="1">s⁻¹</option><option value="2">M⁻¹ s⁻¹</option></select></div>
+        <b></b>
+        <div><button id="b-check" class="primary">Check</button></div>
+      </div>
+      <div class="why" id="feedback" style="display:none"></div>
+    </section>
+  </div>
+
+  <div class="card" style="flex:1 1 500px" id="graphcard">
+    <canvas id="graph" width="520" height="500" aria-label="Graphs of [A], ln[A] and 1/[A] against time"></canvas>
+    <div class="legend" id="glegend"><span><span class="dot" style="background:#1d4ed8"></span>this run</span><span><span class="dot" style="background:#cbd5e1"></span>previous run</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:6px">
+      <label class="chk"><input type="checkbox" id="fit"> Show best-fit lines</label>
+      <label class="chk ex"><input type="checkbox" id="half" checked> Show half-lives</label>
+    </div>
+    <details id="data"><summary>Data table</summary><table class="stats" id="table"></table></details>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note" id="foot">The reaction is run at constant temperature. A real reaction would take seconds to hours; here every run is shown in about 12 seconds, so the clock shows the reaction's own time.</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const KU = ["M/s", "s⁻¹", "M⁻¹ s⁻¹"], ON = ["zero", "first", "second"];
+const KR = [[0.01, 0.05, 0.005, 0.02], [0.01, 0.1, 0.005, 0.04], [0.01, 0.1, 0.005, 0.04]];   // min, max, step, default per order
+const NS = 20, RUNSECS = 12;
+const S = {mode: "explore", order: 1, A0: 1, k: 0.04, t: 0, running: false, done: false, pts: [], ghost: null, tmax: 0, parts: [], fx: [], hidden: null, fit: false, half: true};
+// ---------------------------------------------------------------- the chemistry
+function conc(o, A0, k, t) {
+  if (o === 0) return Math.max(0, A0 - k * t);
+  if (o === 1) return A0 * Math.exp(-k * t);
+  return A0 / (1 + k * A0 * t);
+}
+function tEnd(o, A0, k) { return o === 0 ? 0.95 * A0 / k : o === 1 ? Math.log(20) / k : 19 / (k * A0); }   // until 5% of A is left
+function tHalf(o, A0, k, m) { const f = Math.pow(2, -m); return o === 0 ? A0 * (1 - f) / k : o === 1 ? m * Math.LN2 / k : (1 / f - 1) / (k * A0); }   // time to reach A0/2^m
+const rate = (o, A, k) => k * Math.pow(A, o);
+const cur = () => S.mode === "identify" ? S.hidden : {order: S.order, A0: S.A0, k: S.k};
+function fmt(v, n = 3) { if (v === 0) return "0"; const a = Math.abs(v); return a >= 1000 || a < 0.001 ? v.toExponential(n - 1).replace("e", "E") : (+v.toPrecision(n)).toString(); }
+
+// ---------------------------------------------------------------- molecules
+const W = 520, H = 250;
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function makeParts() {
+  const c = cur(), n = Math.round(70 * c.A0);
+  S.parts = []; for (let i = 0; i < n; i++) { const a = rnd(0, 6.283), sp = rnd(25, 55); S.parts.push({x: rnd(10, W - 10), y: rnd(34, H - 10), vx: sp * Math.cos(a), vy: sp * Math.sin(a), A: true}); }
+  S.n0 = n;
+}
+function moveParts(dt) {
+  for (const p of S.parts) {
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.x < 8) { p.x = 8; p.vx = Math.abs(p.vx); } if (p.x > W - 8) { p.x = W - 8; p.vx = -Math.abs(p.vx); }
+    if (p.y < 32) { p.y = 32; p.vy = Math.abs(p.vy); } if (p.y > H - 8) { p.y = H - 8; p.vy = -Math.abs(p.vy); }
+  }
+  // turn A into product so the count follows [A]
+  const c = cur(), want = Math.round(S.n0 * conc(c.order, c.A0, c.k, S.t) / c.A0);
+  let have = S.parts.filter(p => p.A).length;
+  while (have > want) { const as = S.parts.filter(p => p.A), p = as[Math.floor(Math.random() * as.length)]; p.A = false; have--; if (S.fx.length < 20) S.fx.push({x: p.x, y: p.y, t: 1}); }
+  for (const f of S.fx) f.t -= dt * 2.5;
+  S.fx = S.fx.filter(f => f.t > 0);
+}
+
+// ---------------------------------------------------------------- run control
+function reset(keepGhost) {
+  if (keepGhost && S.pts.length > 1) S.ghost = {pts: S.pts.slice(), tmax: S.tmax};
+  const c = cur();
+  S.t = 0; S.running = false; S.done = false; S.tmax = tEnd(c.order, c.A0, c.k);
+  S.pts = [{t: 0, A: c.A0}]; S.nextSample = 1;
+  makeParts(); $("b-run").textContent = "▶ Start"; table(); readout();
+}
+function advance(dt) {
+  const c = cur(), simDt = dt * S.tmax / RUNSECS;
+  S.t = Math.min(S.tmax, S.t + simDt);
+  while (S.nextSample <= NS && S.t >= S.tmax * S.nextSample / NS - 1e-9) { const t = S.tmax * S.nextSample / NS; S.pts.push({t, A: conc(c.order, c.A0, c.k, t)}); S.nextSample++; table(); }
+  if (S.t >= S.tmax) { S.running = false; S.done = true; $("b-run").textContent = "✓ Done"; explain("done"); }
+}
+
+// ---------------------------------------------------------------- drawing
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, W, H); hiDPI(graph, 520, 500);
+function drawBox() {
+  const g = bg; g.clearRect(0, 0, W, H);
+  g.fillStyle = "#fff"; g.fillRect(0, 0, W, H); g.strokeStyle = "#475569"; g.lineWidth = 3; g.strokeRect(1.5, 1.5, W - 3, H - 3);
+  for (const f of S.fx) { g.beginPath(); g.arc(f.x, f.y, 6 + 10 * (1 - f.t), 0, 6.283); g.strokeStyle = `rgba(234,88,12,${f.t})`; g.lineWidth = 2; g.stroke(); }
+  for (const p of S.parts) if (!p.A) { g.beginPath(); g.arc(p.x, p.y, 4, 0, 6.283); g.fillStyle = "#cbd5e1"; g.fill(); }
+  for (const p of S.parts) if (p.A) { g.beginPath(); g.arc(p.x, p.y, 5.5, 0, 6.283); g.fillStyle = "#2563eb"; g.fill(); }
+  const c = cur(), A = conc(c.order, c.A0, c.k, S.t);
+  g.fillStyle = "rgba(255,255,255,.85)"; g.fillRect(6, 6, 330, 22);
+  g.fillStyle = "#1f2937"; g.font = "bold 14px Arial"; g.textAlign = "left";
+  g.fillText(`t = ${S.t.toFixed(S.tmax > 200 ? 0 : 1)} s     [A] = ${A.toFixed(3)} M`, 12, 22);
+  // progress bar
+  g.fillStyle = "#e2e8f0"; g.fillRect(W - 160, 12, 140, 8); g.fillStyle = "#1d4ed8"; g.fillRect(W - 160, 12, 140 * S.t / S.tmax, 8);
+}
+const PX0 = 66, PX1 = 505, PLOTS = [{key: "A", lbl: "[A] (M)", y0: 12}, {key: "ln", lbl: "ln[A]", y0: 172}, {key: "inv", lbl: "1/[A] (M⁻¹)", y0: 332}], PH = 125;
+const yv = (key, A) => key === "A" ? A : key === "ln" ? Math.log(A) : 1 / A;
+function niceStep(range) { const r = range / 4, e = Math.pow(10, Math.floor(Math.log10(r))); for (const m of [1, 2, 2.5, 5, 10]) if (r <= m * e) return m * e; return 10 * e; }
+function fitLine(xs, ys) {
+  const n = xs.length; if (n < 3) return null;
+  const mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n;
+  let sxx = 0, sxy = 0, syy = 0; for (let i = 0; i < n; i++) { sxx += (xs[i] - mx) ** 2; sxy += (xs[i] - mx) * (ys[i] - my); syy += (ys[i] - my) ** 2; }
+  const b = sxy / sxx; return {a: my - b * mx, b, r2: syy ? sxy * sxy / (sxx * syy) : 1};
+}
+function drawGraph() {
+  const g = gg; g.clearRect(0, 0, 520, 500);
+  const tmax = Math.max(S.tmax, S.ghost ? S.ghost.tmax : 0), X = t => PX0 + t / tmax * (PX1 - PX0);
+  const all = S.pts.concat(S.ghost ? S.ghost.pts : []), c = cur();
+  S.fits = {};
+  for (const pl of PLOTS) {
+    const vals = all.map(p => yv(pl.key, p.A));
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (pl.key !== "ln") lo = 0;
+    if (hi - lo < 1e-6) hi = lo + 1;
+    const st = niceStep(hi - lo); lo = Math.floor(lo / st) * st; hi = Math.ceil(hi / st + 0.001) * st;
+    const Y = v => pl.y0 + PH - (v - lo) / (hi - lo) * PH;
+    g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+    for (let v = lo; v <= hi + st * 0.01; v += st) { g.beginPath(); g.moveTo(PX0, Y(v)); g.lineTo(PX1, Y(v)); g.stroke(); g.fillText(+v.toFixed(3), PX0 - 5, Y(v) + 4); }
+    g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(PX0, pl.y0); g.lineTo(PX0, pl.y0 + PH); g.lineTo(PX1, pl.y0 + PH); g.stroke();
+    g.save(); g.translate(13, pl.y0 + PH / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText(pl.lbl, 0, 0); g.restore();
+    // time ticks
+    const ts = niceStep(tmax); g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "center";
+    for (let t = 0; t <= tmax + 1e-9; t += ts) { g.strokeStyle = "#94a3b8"; g.beginPath(); g.moveTo(X(t), pl.y0 + PH); g.lineTo(X(t), pl.y0 + PH + 4); g.stroke(); g.fillText(+t.toFixed(1), X(t), pl.y0 + PH + 15); }
+    // half-life markers on the [A] plot
+    if (pl.key === "A" && S.half && S.mode === "explore") {
+      for (let m = 1; m <= 4; m++) {
+        const th = tHalf(c.order, c.A0, c.k, m); if (th > S.t || th > S.tmax) break;
+        const a = c.A0 / Math.pow(2, m);
+        g.strokeStyle = "#f59e0b"; g.setLineDash([4, 3]); g.lineWidth = 1.5; g.beginPath(); g.moveTo(PX0, Y(a)); g.lineTo(X(th), Y(a)); g.lineTo(X(th), pl.y0 + PH); g.stroke(); g.setLineDash([]);
+        g.fillStyle = "#b45309"; g.font = "bold 11px Arial"; g.textAlign = "left"; g.fillText(m === 1 ? "½" : `1/${Math.pow(2, m)}`, X(th) + 3, Y(a) - 3);
+      }
+    }
+    if (S.ghost) for (const p of S.ghost.pts) { g.beginPath(); g.arc(X(p.t), Y(yv(pl.key, p.A)), 3.5, 0, 6.283); g.fillStyle = "#cbd5e1"; g.fill(); }
+    for (const p of S.pts) { g.beginPath(); g.arc(X(p.t), Y(yv(pl.key, p.A)), 4, 0, 6.283); g.fillStyle = "#1d4ed8"; g.fill(); }
+    // best-fit line through this run
+    const f = fitLine(S.pts.map(p => p.t), S.pts.map(p => yv(pl.key, p.A))); S.fits[pl.key] = f;
+    if (S.fit && f) {
+      g.save(); g.beginPath(); g.rect(PX0, pl.y0, PX1 - PX0, PH); g.clip();
+      g.strokeStyle = f.r2 > 0.999 ? "#059669" : "#dc2626"; g.lineWidth = 2; g.setLineDash([7, 4]);
+      const tl = S.pts[S.pts.length - 1].t; g.beginPath(); g.moveTo(X(0), Y(f.a)); g.lineTo(X(tl), Y(f.a + f.b * tl)); g.stroke(); g.setLineDash([]); g.restore();
+      g.fillStyle = f.r2 > 0.999 ? "#047857" : "#b91c1c"; g.font = "bold 12px Arial"; g.textAlign = "right";
+      g.fillText(`R² = ${f.r2.toFixed(4)}   slope = ${fmt(f.b)}`, PX1 - 4, pl.y0 + 12);
+    }
+  }
+  g.fillStyle = "#1f2937"; g.font = "bold 12px Arial"; g.textAlign = "center"; g.fillText("Time (s)", (PX0 + PX1) / 2, 497);
+}
+function readout() {
+  const c = cur(), A = conc(c.order, c.A0, c.k, S.t);
+  if (S.mode === "identify") { $("readout").innerHTML = `[A]<sub>0</sub> = ${c.A0.toFixed(2)} M. &nbsp;The rate law is hidden: run the reaction and use the graphs.`; return; }
+  let h = `Rate law: <b>rate = ${c.order === 0 ? "k[A]<sup>0</sup> = k" : c.order === 1 ? "k[A]" : "k[A]<sup>2</sup>"}</b> &nbsp; Rate now: <b>${fmt(rate(c.order, A, c.k))} M/s</b>`;
+  const hs = []; for (let m = 1; m <= 4; m++) { const t1 = tHalf(c.order, c.A0, c.k, m - 1), t2 = tHalf(c.order, c.A0, c.k, m); if (t2 <= S.t + 1e-9 && t2 <= S.tmax) hs.push(fmt(t2 - t1, 3) + " s"); }
+  if (S.half) h += `<br>Half-lives so far: ${hs.length ? hs.map((x, i) => `${["1st", "2nd", "3rd", "4th"][i]}: <b>${x}</b>`).join(", ") : "none yet"}`;
+  $("readout").innerHTML = h;
+}
+function table() {
+  $("table").innerHTML = `<tr><th>t (s)</th><th>[A] (M)</th><th>ln[A]</th><th>1/[A] (M⁻¹)</th></tr>` +
+    S.pts.map(p => `<tr><td>${fmt(p.t)}</td><td>${p.A.toFixed(4)}</td><td>${Math.log(p.A).toFixed(3)}</td><td>${fmt(1 / p.A, 4)}</td></tr>`).join("");
+}
+
+// ---------------------------------------------------------------- explanations
+function explain(kind) {
+  const o = S.mode === "identify" ? null : S.order;
+  const ORD = [
+    "<b>Zero order:</b> the rate does not depend on [A], so [A] drops by the <b>same amount</b> every second. <b>[A] vs t is a straight line</b> with slope = −k. Each half-life is half as long as the one before: t<sub>½</sub> = [A]<sub>0</sub>/2k.",
+    "<b>First order:</b> the rate is proportional to [A], so [A] drops by the <b>same fraction</b> in equal times. <b>ln[A] vs t is a straight line</b> with slope = −k. Every half-life is the same: t<sub>½</sub> = 0.693/k, whatever [A]<sub>0</sub> is.",
+    "<b>Second order:</b> the rate is proportional to [A]<sup>2</sup>, so it slows down a lot as A is used up. <b>1/[A] vs t is a straight line</b> with slope = +k. Each half-life is twice as long as the one before: t<sub>½</sub> = 1/(k[A]<sub>0</sub>)."
+  ];
+  let h;
+  if (S.mode === "identify") h = kind === "done"
+    ? "Which of the three graphs is a straight line? That tells you the order. Turn on <b>Show best-fit lines</b> to check, and use the slope of the straight one to find k (careful with the sign)."
+    : "A mystery reaction A → products. Run it, find which graph is a straight line, and work out the order and the rate constant k with its units.";
+  else if (kind === "a0") h = ORD[o] + ` <br><span style="color:var(--muted)">The grey dots are the previous run, so you can compare.</span>` + (o === 1 ? " Changing [A]<sub>0</sub> does <b>not</b> change the half-life." : " Changing [A]<sub>0</sub> <b>changes</b> the half-life.");
+  else if (kind === "k") h = ORD[o] + " A bigger k makes the reaction faster: the straight line is <b>steeper</b>.";
+  else h = ORD[o];
+  $("why").innerHTML = h;
+}
+
+// ---------------------------------------------------------------- controls
+function setOrder(o, keepGhost) {
+  S.order = o;
+  for (const b of document.querySelectorAll("[data-order]")) b.classList.toggle("on", +b.dataset.order === o);
+  const [mn, mx, st, df] = KR[o]; Object.assign($("k"), {min: mn, max: mx, step: st}); S.k = df; $("k").value = df;
+  showVals(); reset(keepGhost); explain("order");
+}
+function showVals() { $("a0v").textContent = `${S.A0.toFixed(2)} M`; $("kv").textContent = `${S.k.toFixed(3)} ${KU[S.order]}`; }
+for (const b of document.querySelectorAll("[data-order]")) b.onclick = () => { S.ghost = null; setOrder(+b.dataset.order, false); };
+$("a0").addEventListener("change", e => { S.A0 = +e.target.value; showVals(); reset(true); explain("a0"); });
+$("a0").addEventListener("input", e => { S.A0 = +e.target.value; showVals(); });
+$("k").addEventListener("change", e => { S.k = +e.target.value; showVals(); reset(true); explain("k"); });
+$("k").addEventListener("input", e => { S.k = +e.target.value; showVals(); });
+$("b-run").onclick = () => {
+  if (S.done) return;
+  S.running = !S.running; $("b-run").textContent = S.running ? "❚❚ Pause" : "▶ Start";
+};
+$("b-reset").onclick = () => reset(false);
+$("b-new").onclick = () => { newHidden(); S.ghost = null; reset(false); $("feedback").style.display = "none"; $("q-order").value = ""; $("q-k").value = ""; $("q-unit").value = ""; explain("start"); };
+$("fit").onchange = () => { S.fit = $("fit").checked; };
+$("half").onchange = () => { S.half = $("half").checked; readout(); };
+function newHidden() {
+  const prev = S.hidden ? S.hidden.order : -1; let o;
+  do { o = Math.floor(Math.random() * 3); } while (o === prev && Math.random() < 0.6);
+  const [mn, mx, st] = KR[o], steps = Math.round((mx - mn) / st);
+  S.hidden = {order: o, A0: [0.8, 1, 1.2, 1.5][Math.floor(Math.random() * 4)], k: +(mn + st * Math.floor(Math.random() * (steps + 1))).toFixed(3)};
+}
+$("b-check").onclick = () => {
+  const h = S.hidden, fb = $("feedback"); fb.style.display = "";
+  if (S.pts.length < 6) { fb.innerHTML = "Run the reaction first (at least part of the way) so you have data to look at."; return; }
+  const qo = $("q-order").value, qk = parseFloat($("q-k").value.replace(",", ".").replace(/[eE]/, "e")), qu = $("q-unit").value;
+  const okO = qo !== "" && +qo === h.order, okK = isFinite(qk) && Math.abs(qk - h.k) / h.k <= 0.1, okU = qu !== "" && +qu === h.order;
+  const graphs = ["[A] vs t", "ln[A] vs t", "1/[A] vs t"];
+  let s = `<div class="${okO ? "ok" : "bad"}">${okO ? "✓" : "✗"} Order: ${okO ? `correct, <b>${ON[h.order]} order</b>.` : `not quite. Look again: which graph is a straight line? For ${qo === "" ? "the order you pick" : ON[+qo] + " order"} the straight one would be ${qo === "" ? "…" : graphs[+qo]}.`}</div>`;
+  if (okO) {
+    s += `<div class="${okK ? "ok" : "bad"}">${okK ? "✓" : "✗"} k: ${okK ? `correct (k = ${h.k.toFixed(3)}).` : isFinite(qk) && Math.abs(-qk - h.k) / h.k <= 0.1 ? "check the sign: k is always positive (slope = −k for the [A] and ln[A] graphs)." : `not quite. Use the slope of the straight graph (${graphs[h.order]}): ${h.order === 2 ? "slope = +k" : "slope = −k"}.`}</div>`;
+    s += `<div class="${okU ? "ok" : "bad"}">${okU ? "✓" : "✗"} Units: ${okU ? `correct, ${KU[h.order]}.` : `for a ${ON[h.order]}-order reaction the units of k make rate = k[A]${h.order === 1 ? "" : "<sup>" + h.order + "</sup>"} come out in M/s.`}</div>`;
+    if (okK && okU) s += `<div style="margin-top:6px">The rate law is <b>rate = ${h.k.toFixed(3)} ${KU[h.order]} × [A]${h.order === 1 ? "" : "<sup>" + h.order + "</sup>"}</b>. Press <b>New reaction</b> for another one.</div>`;
+  }
+  fb.innerHTML = s;
+};
+function setMode(m) {
+  S.mode = m; S.ghost = null;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const e of document.querySelectorAll(".ex")) e.style.display = m === "explore" ? "" : "none";
+  for (const e of document.querySelectorAll(".id")) e.style.display = m === "identify" ? "" : "none";
+  $("glegend").style.display = m === "explore" ? "" : "none";
+  if (m === "identify") { if (!S.hidden) newHidden(); S.fit = false; $("fit").checked = false; reset(false); explain("start"); }
+  else setOrder(S.order, false);
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+
+// ---------------------------------------------------------------- first-visit tours
+const TOURS = {
+  explore: [
+    ["#box", "Molecules of A (blue) turn into product (grey). Press <b>Start</b> to run the reaction."],
+    ["#ctl", "Choose the order of the reaction, the starting concentration [A]<sub>0</sub> and the rate constant k. After a change, the old run stays as grey dots so you can compare."],
+    ["#graph", "The same data plotted three ways: [A], ln[A] and 1/[A] against time. For each order, exactly <b>one</b> of these is a straight line. The orange lines mark the half-lives."]
+  ],
+  identify: [
+    ["#graph", "A mystery reaction. Run it and look for the graph that is a straight line. <b>Show best-fit lines</b> gives R² and the slope."],
+    ["#answer", "Enter the order and the rate constant k with its units, then press <b>Check</b>. <b>New reaction</b> gives you another one."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-kin-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {explore: "Explore", identify: "Identify the order"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
+// ---------------------------------------------------------------- run
+let last = performance.now(), roT = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.running) advance(dt);
+  moveParts(dt); drawBox(); drawGraph();
+  if ((roT -= dt) <= 0) { roT = 0.2; readout(); }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const o = q.get("order"); if (o === "0" || o === "1" || o === "2") S.order = +o;
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "identify" ? "identify" : "explore");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>

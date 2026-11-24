@@ -32,6 +32,8 @@ class sims {
         'pes' => ['file' => 'pes.html', 'height' => 1150, 'options' => ['mode', 'el', 'compare', 'tabs', 'tour']],
         'boltzmann' => ['file' => 'boltzmann.html', 'height' => 900, 'options' => ['mode', 'gas', 'title', 'tour']],
         'equilibrium' => ['file' => 'equilibrium.html', 'height' => 1000, 'options' => ['predict', 'title', 'tour']],
+        'gaslaws' => ['file' => 'gaslaws.html', 'height' => 1000, 'options' => ['mode', 'graph', 'title', 'tour']],
+        'kinetics' => ['file' => 'kinetics.html', 'height' => 1000, 'options' => ['mode', 'order', 'title', 'tour']],
         'solubility' => ['file' => 'solubility.html', 'height' => 1050, 'options' => ['mode', 'salt', 'predict', 'title', 'tour']],
     ];
 

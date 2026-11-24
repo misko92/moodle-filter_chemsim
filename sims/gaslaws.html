@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gas Laws</title>
+<style>
+:root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --card: #f8fafc; --accent: #1d4ed8; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 15px; }
+body { padding: 12px 16px 24px; max-width: 1180px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 4px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 2px solid var(--line); margin-bottom: 10px; align-items: flex-end; }
+.tabs button[data-mode] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 12px; color: var(--muted); font-weight: bold; margin-bottom: -2px; min-height: 0; }
+.tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+.row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+canvas { display: block; width: 100%; height: auto; touch-action: none; }
+button { font: inherit; font-size: 14px; padding: 8px 11px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: var(--ink); cursor: pointer; min-height: 40px; }
+button:hover { background: #f1f5f9; }
+button.on, button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .45; cursor: default; }
+select { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 8px; border: 1px solid #cbd5e1; min-height: 40px; background: #fff; }
+.ctl { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; margin-top: 10px; }
+.ctl > b { font-size: 13px; color: var(--muted); font-weight: normal; text-align: right; }
+.ctl > div { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+input[type=range] { flex: 1 1 160px; height: 32px; min-width: 140px; }
+.val { font-weight: bold; min-width: 6.5em; }
+.legend { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; align-items: center; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+.grad { display: inline-block; width: 70px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #2563eb, #22c55e, #f59e0b, #dc2626); vertical-align: 0; margin: 0 4px; }
+table.stats { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 8px; }
+table.stats td, table.stats th { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
+table.stats th { font-size: 12px; color: var(--muted); font-weight: normal; }
+table.stats td.k { font-weight: bold; color: #047857; }
+.why { font-size: 14px; line-height: 1.5; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+.warn { color: #b45309; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+label.chk { font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.mode { display: none; } .mode.active { display: block; }
+.gbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 6px; }
+.tourbtn { margin-left: auto; align-self: center; width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); background: #fff; font-weight: bold; font-size: 17px; }
+.tour-block { position: absolute; left: 0; top: 0; z-index: 900; }
+.tour-hole { position: absolute; z-index: 901; border: 3px solid #facc15; border-radius: 10px; box-shadow: 0 0 0 9999px rgba(15, 23, 42, .55); pointer-events: none; transition: all .25s ease; }
+.tour-card { position: absolute; z-index: 902; width: 340px; max-width: calc(100vw - 32px); background: #fff; border-radius: 12px; padding: 14px 16px 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 15px; line-height: 1.45; }
+.tour-card .tstep { font-size: 12px; color: var(--muted); font-weight: bold; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.tour-card .tbtns { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.tour-card .tbtns .skip { margin-right: auto; border: none; background: none; color: var(--muted); padding: 8px 4px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<h1 id="title">Gas Laws</h1>
+<nav class="tabs" id="tabs">
+  <button data-mode="laws">Gas laws</button>
+  <button data-mode="mix">Partial pressures</button>
+  <button id="tour-btn" class="tourbtn" aria-label="Show how this page works" title="How this page works">?</button>
+</nav>
+
+<div class="row">
+  <div class="card" style="flex:1 1 480px" id="boxcard">
+    <canvas id="box" width="520" height="340" aria-label="Gas molecules in a container with a piston and a pressure gauge"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="ctl" id="ctl">
+      <b class="lw">Piston</b>
+      <div class="lw"><button id="b-lock">🔒 Locked (V constant)</button><button id="b-free">⇕ Free (P constant)</button></div>
+      <b class="lw">Amount</b>
+      <div class="lw"><input type="range" id="n" min="0.2" max="1" step="0.05" value="0.4"><span class="val" id="nv"></span></div>
+      <b class="mx">Helium</b>
+      <div class="mx"><input type="range" id="na" min="0" max="0.6" step="0.05" value="0.3"><span class="val" id="nav"></span></div>
+      <b class="mx">Xenon</b>
+      <div class="mx"><input type="range" id="nb" min="0" max="0.6" step="0.05" value="0.3"><span class="val" id="nbv"></span></div>
+      <b>Temperature</b>
+      <div><input type="range" id="temp" min="100" max="600" step="10" value="300"><span class="val" id="tempv"></span></div>
+      <b id="vlbl">Volume</b>
+      <div id="vrow"><input type="range" id="vol" min="4" max="20" step="0.1" value="9.8"><span class="val" id="volv"></span></div>
+      <b class="lw fr">Outside pressure</b>
+      <div class="lw fr"><input type="range" id="pext" min="0.2" max="10" step="0.05" value="1"><span class="val" id="pextv"></span></div>
+      <b></b>
+      <div><button id="b-rec" class="primary lw">● Record data point</button><button id="b-pause">❚❚ Pause</button></div>
+    </div>
+  </div>
+
+  <div class="card" style="flex:1 1 480px" id="graphcard">
+    <section class="mode" id="m-laws">
+      <div class="gbar"><b style="font-size:13px;color:var(--muted)">Graph</b><select id="axis"></select>
+        <label class="chk" id="degc-l"><input type="checkbox" id="degc"> T in °C</label>
+        <button id="b-clear">Clear points</button></div>
+    </section>
+    <section class="mode" id="m-mix"><h2>Pressure of each gas</h2></section>
+    <canvas id="graph" width="520" height="300" aria-label="Graph of the recorded gas data"></canvas>
+    <div class="legend" id="glegend"></div>
+    <table class="stats" id="table"></table>
+    <div class="why" id="why"></div>
+  </div>
+</div>
+<div class="note" id="foot"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const R = 8.314, RL = 0.08206;
+const GASES = {N2: {f: "N₂", M: 0.02802, col: "#6366f1", r: 4.5}, He: {f: "He", M: 0.004003, col: "#0ea5e9", r: 3.3}, Xe: {f: "Xe", M: 0.1313, col: "#a855f7", r: 6}};
+const PER = 0.005;                              // mol represented by each drawn molecule
+const W = 520, H = 340, X0 = 30, X1 = 330, YB = 326, HMAX = 288, VMAX = 20, VMIN = 4, DEPTH = 200, SCALE = 0.12;
+const S = {mode: "laws", hold: "V", n: 0.4, na: 0.3, nb: 0.3, T: 300, V: 9.8, Pext: 1, h: 9.8 / VMAX * HMAX, parts: [], hits: {}, rate: {N2: 0, He: 0, Xe: 0}, prate: 0,
+  fx: [], recs: [], axis: "PV", degC: false, paused: false, stop: false};
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+const vol = () => S.h / HMAX * VMAX;            // L, from the piston position
+const yTop = () => YB - S.h;
+function newPart(g, atInlet) {
+  const M = GASES[g].M, sd = Math.sqrt(R * S.T / M), r = GASES[g].r;
+  return {g, M, r, x: atInlet ? X0 + r + 2 : rnd(X0 + r, X1 - r), y: atInlet ? YB - 14 : rnd(yTop() + r, YB - r), z: rnd(0, DEPTH),
+    vx: sd * Math.abs(gauss()), vy: sd * gauss(), vz: sd * gauss(), born: atInlet ? 1 : 0};
+}
+function setCount(g, want, atInlet) {           // add or remove molecules of one gas
+  const have = S.parts.filter(p => p.g === g).length;
+  if (want > have) for (let i = have; i < want; i++) S.parts.push(newPart(g, atInlet));
+  else for (let i = have; i > want; i--) { const idx = S.parts.map((p, k) => p.g === g ? k : -1).filter(k => k >= 0); S.parts.splice(idx[Math.floor(Math.random() * idx.length)], 1); }
+}
+const count = g => S.parts.filter(p => p.g === g).length;
+const ke = p => 0.5 * p.M * (p.vx * p.vx + p.vy * p.vy + p.vz * p.vz);
+function Tof(g) { const ps = S.parts.filter(p => p.g === g); if (!ps.length) return S.T; return ps.reduce((t, p) => t + ke(p), 0) / ps.length / (1.5 * R); }
+const gasesNow = () => S.mode === "mix" ? ["He", "Xe"] : ["N2"];
+// pressure from the molecules themselves: P = nRT/V with T from their kinetic energy
+const Pgas = g => count(g) * PER * RL * Tof(g) / vol();
+const Ptot = () => gasesNow().reduce((t, g) => t + Pgas(g), 0);
+const nTot = () => S.parts.length * PER;
+function targetV() {
+  if (S.mode === "laws" && S.hold === "P") {
+    const v = nTot() * RL * S.T / S.Pext; S.stop = v < VMIN - 1e-9 ? "bottom" : v > VMAX + 1e-9 ? "top" : false;
+    return Math.max(VMIN, Math.min(VMAX, v));
+  }
+  S.stop = false; return S.V;
+}
+
+// ---------------------------------------------------------------- dynamics (ideal gas: molecules only hit the walls)
+function step(dt) {
+  const ht = targetV() / VMAX * HMAX;
+  S.h += (ht - S.h) * Math.min(1, dt / 0.35);
+  if (Math.abs(ht - S.h) < 0.05) S.h = ht;
+  for (const g of gasesNow()) {          // the walls are held at the set temperature
+    const Tm = Tof(g);
+    if (Math.abs(Tm / S.T - 1) > 0.002) { const f = Math.pow(S.T / Tm, 0.5 * Math.min(1, dt / 0.35)); for (const p of S.parts) if (p.g === g) { p.vx *= f; p.vy *= f; p.vz *= f; } }
+  }
+  const yt = yTop(), hits = {N2: 0, He: 0, Xe: 0}; let ph = 0;
+  for (const p of S.parts) {
+    p.x += p.vx * SCALE * dt; p.y += p.vy * SCALE * dt; p.z += p.vz * SCALE * dt;
+    if (p.born) p.born = Math.max(0, p.born - dt * 1.5);
+    const r = p.r, flash = (x, y, vert) => { if (S.fx.length < 60) S.fx.push({x, y, vert, t: 1}); };
+    if (p.x < X0 + r) { p.x = X0 + r; p.vx = Math.abs(p.vx); hits[p.g]++; flash(X0, p.y, true); }
+    if (p.x > X1 - r) { p.x = X1 - r; p.vx = -Math.abs(p.vx); hits[p.g]++; flash(X1, p.y, true); }
+    if (p.y < yt + r) { if (p.vy < 0) { hits[p.g]++; ph++; flash(p.x, yt, false); } p.y = yt + r; p.vy = Math.abs(p.vy); }
+    if (p.y > YB - r) { p.y = YB - r; p.vy = -Math.abs(p.vy); hits[p.g]++; flash(p.x, YB, false); }
+    if (p.z < 0) { p.z = 0; p.vz = Math.abs(p.vz); hits[p.g]++; }
+    if (p.z > DEPTH) { p.z = DEPTH; p.vz = -Math.abs(p.vz); hits[p.g]++; }
+  }
+  const k = Math.min(1, dt / 3);
+  for (const g in hits) S.rate[g] += (hits[g] / dt - S.rate[g]) * k;
+  S.prate += (ph / dt - S.prate) * Math.min(1, dt / 4);
+  for (const f of S.fx) f.t -= dt * 4;
+  S.fx = S.fx.filter(f => f.t > 0);
+}
+
+// ---------------------------------------------------------------- drawing: container, piston, gauge
+const box = $("box"), bg = box.getContext("2d"), graph = $("graph"), gg = graph.getContext("2d");
+function hiDPI(c, w, h) { const r = Math.min(2, window.devicePixelRatio || 1); c.width = w * r; c.height = h * r; c.getContext("2d").setTransform(r, 0, 0, r, 0, 0); }
+hiDPI(box, W, H); hiDPI(graph, 520, 300);
+function speedColour(t) {
+  const stops = [[37, 99, 235], [34, 197, 94], [245, 158, 11], [220, 38, 38]], u = Math.max(0, Math.min(0.999, t)) * 3, i = Math.floor(u), f = u - i;
+  const c = stops[i].map((v, k) => Math.round(v + (stops[i + 1][k] - v) * f)); return `rgb(${c})`;
+}
+const sig3 = v => v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v >= 1 ? v.toFixed(2) : v.toFixed(3);
+function drawBox() {
+  const g = bg; g.clearRect(0, 0, W, H);
+  const yt = yTop(), warm = (S.T - 100) / 500;
+  // gas region
+  g.fillStyle = `rgb(${Math.round(244 + 11 * warm)},${Math.round(247 - 17 * warm)},${Math.round(252 - 42 * warm)})`; g.fillRect(X0, yt, X1 - X0, YB - yt);
+  // inlet pipe
+  g.fillStyle = "#94a3b8"; g.fillRect(4, YB - 22, X0 - 4, 14); g.fillStyle = "#475569"; g.fillRect(10, YB - 27, 6, 24);
+  // walls
+  g.strokeStyle = "#475569"; g.lineWidth = 4; g.beginPath(); g.moveTo(X0 - 2, 12); g.lineTo(X0 - 2, YB + 2); g.lineTo(X1 + 2, YB + 2); g.lineTo(X1 + 2, 12); g.stroke();
+  // wall-hit flashes
+  for (const f of S.fx) {
+    g.strokeStyle = `rgba(234,88,12,${f.t})`; g.lineWidth = 3; g.beginPath();
+    if (f.vert) { g.moveTo(f.x, f.y - 6); g.lineTo(f.x, f.y + 6); } else { g.moveTo(f.x - 6, f.y); g.lineTo(f.x + 6, f.y); }
+    g.stroke();
+  }
+  // molecules (far ones first)
+  const sorted = S.parts.slice().sort((a, b) => b.z - a.z);
+  for (const p of sorted) {
+    const r = p.r * (1.15 - 0.35 * p.z / DEPTH);
+    const col = S.mode === "mix" ? GASES[p.g].col : speedColour(Math.hypot(p.vx, p.vy, p.vz) / (2.2 * Math.sqrt(2 * R * 300 / p.M)));
+    if (p.born) { g.beginPath(); g.arc(p.x, p.y, r + 6 * p.born, 0, 6.283); g.fillStyle = `rgba(34,197,94,${0.35 * p.born})`; g.fill(); }
+    g.beginPath(); g.arc(p.x, p.y, r, 0, 6.283); g.fillStyle = col; g.fill();
+  }
+  // piston + rod
+  g.fillStyle = "#64748b"; g.fillRect((X0 + X1) / 2 - 6, 0, 12, yt - 12);
+  g.fillStyle = "#334155"; g.fillRect(X0, yt - 13, X1 - X0, 13);
+  g.fillStyle = "#cbd5e1"; g.fillRect(X0 + 4, yt - 9, X1 - X0 - 8, 3);
+  if (S.mode === "laws" && S.hold === "P") {
+    // weights stand for the outside pressure
+    const nW = Math.max(1, Math.min(8, Math.round(S.Pext))), wy = yt - 13;
+    for (let i = 0; i < nW; i++) { const bw = 70 - i * 3; g.fillStyle = i % 2 ? "#78716c" : "#57534e"; g.fillRect((X0 + X1) / 2 - bw / 2 - 40, wy - (i + 1) * 9, bw, 8); g.fillRect((X0 + X1) / 2 - bw / 2 + 40, wy - (i + 1) * 9, bw, 8); }
+    g.fillStyle = "#1f2937"; g.font = "bold 12px Arial"; g.textAlign = "left"; g.fillText(`outside: ${S.Pext.toFixed(2)} atm`, X0 + 6, Math.max(12, wy - nW * 9 - 6));
+    if (S.stop) { g.fillStyle = "#b45309"; g.fillText(S.stop === "top" ? "piston at the top stop" : "piston at the bottom stop", X0 + 6, yt + 16); }
+  } else {
+    // pins hold the piston
+    for (const x of [X0 - 9, X1 + 9]) { g.fillStyle = "#dc2626"; g.beginPath(); g.arc(x, yt - 7, 5, 0, 6.283); g.fill(); }
+    if (S.mode === "laws") { g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "center"; g.fillText("⇕ drag piston", (X0 + X1) / 2 + 52, Math.max(12, yt - 18)); }
+  }
+  // volume ruler
+  g.strokeStyle = "#94a3b8"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "10px Arial"; g.textAlign = "left";
+  for (let v = 0; v <= VMAX; v += 2) { const y = YB - v / VMAX * HMAX; g.beginPath(); g.moveTo(X1 + 5, y); g.lineTo(X1 + (v % 4 ? 9 : 13), y); g.stroke(); if (v % 4 === 0) g.fillText(v + " L", X1 + 15, y + 3); }
+  // gauge
+  const P = Ptot(), cx = 440, cy = 92, rr = 62, PMAX = 15;
+  g.beginPath(); g.arc(cx, cy, rr, 0, 6.283); g.fillStyle = "#fff"; g.fill(); g.lineWidth = 4; g.strokeStyle = "#334155"; g.stroke();
+  const ang = v => Math.PI * (0.75 + 1.5 * Math.min(v, PMAX) / PMAX);
+  g.lineWidth = 1.5; g.strokeStyle = "#475569"; g.fillStyle = "#334155"; g.font = "10px Arial"; g.textAlign = "center";
+  for (let v = 0; v <= PMAX; v++) { const a = ang(v), l = v % 5 ? 6 : 11; g.beginPath(); g.moveTo(cx + Math.cos(a) * (rr - 3), cy + Math.sin(a) * (rr - 3)); g.lineTo(cx + Math.cos(a) * (rr - 3 - l), cy + Math.sin(a) * (rr - 3 - l)); g.stroke(); if (v % 5 === 0) g.fillText(v, cx + Math.cos(a) * (rr - 22), cy + Math.sin(a) * (rr - 22) + 4); }
+  const a = ang(P); g.strokeStyle = "#dc2626"; g.lineWidth = 3; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * (rr - 12), cy + Math.sin(a) * (rr - 12)); g.stroke();
+  g.beginPath(); g.arc(cx, cy, 5, 0, 6.283); g.fillStyle = "#334155"; g.fill();
+  g.font = "11px Arial"; g.fillText("atm", cx, cy + 26);
+  g.font = "bold 16px Arial"; g.fillStyle = "#1f2937"; g.fillText(`P = ${sig3(P)} atm`, cx, cy + rr + 22);
+  // readouts
+  g.font = "14px Arial"; g.textAlign = "left"; g.fillStyle = "#1f2937";
+  const lines = S.mode === "mix"
+    ? [`V = ${vol().toFixed(1)} L`, `T = ${S.T} K`, `n(He) = ${(count("He") * PER).toFixed(2)} mol`, `n(Xe) = ${(count("Xe") * PER).toFixed(2)} mol`]
+    : [`V = ${vol().toFixed(1)} L`, `T = ${S.T} K`, `n = ${nTot().toFixed(2)} mol`];
+  lines.forEach((t, i) => g.fillText(t, 384, 200 + i * 20));
+  g.fillStyle = "#6b7280"; g.font = "12px Arial";
+  g.fillText(`piston hits: ${Math.round(S.prate)} per s`, 384, 200 + lines.length * 20 + 4);
+  if (S.paused) { g.font = "bold 15px Arial"; g.fillStyle = "#334155"; g.fillText("Paused", X0 + 6, YB - 8); }
+}
+
+// ---------------------------------------------------------------- graph tab: recorded points
+const AX = {
+  PV: {x: "V", y: "P", held: ["n", "T"], law: "Boyle's law: P ∝ 1/V", calc: "PV", calcLbl: "P × V (atm·L)"},
+  PinvV: {x: "invV", y: "P", held: ["n", "T"], law: "Boyle's law: P ∝ 1/V", calc: "PV", calcLbl: "P × V (atm·L)"},
+  PT: {x: "T", y: "P", held: ["n", "V"], law: "Gay-Lussac's law: P ∝ T", calc: "P/T", calcLbl: "P / T (atm/K)"},
+  VT: {x: "T", y: "V", held: ["n", "P"], law: "Charles's law: V ∝ T", calc: "V/T", calcLbl: "V / T (L/K)"},
+  Pn: {x: "n", y: "P", held: ["T", "V"], law: "P ∝ n", calc: "P/n", calcLbl: "P / n (atm/mol)"},
+  Vn: {x: "n", y: "V", held: ["T", "P"], law: "Avogadro's law: V ∝ n", calc: "V/n", calcLbl: "V / n (L/mol)"}
+};
+const AXNAME = {PV: "P vs V", PinvV: "P vs 1/V", PT: "P vs T", VT: "V vs T", Pn: "P vs n", Vn: "V vs n"};
+const QLBL = {P: "Pressure (atm)", V: "Volume (L)", invV: "1/V (1/L)", n: "Amount of gas (mol)"};
+const VARNAME = {n: "n", T: "T", V: "V", P: "P"};
+$("axis").innerHTML = Object.keys(AX).map(k => `<option value="${k}">${AXNAME[k]}</option>`).join("");
+function xval(r, q) { return q === "invV" ? 1 / r.V : q === "T" && S.degC ? r.T - 273 : r[q]; }
+function calcVal(r, c) { return c === "PV" ? r.P * r.V : c === "P/T" ? r.P / r.T : c === "V/T" ? r.V / r.T : c === "P/n" ? r.P / r.n : r.V / r.n; }
+function niceUp(v) { const e = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (v <= m * e + 1e-9) return m * e; return 10 * e; }
+const GX0 = 56, GX1 = 505, GY0 = 14, GY1 = 250;
+function nowRec() { return {n: +nTot().toFixed(3), T: S.T, V: +vol().toFixed(2), P: Ptot()}; }
+function drawLaws() {
+  const g = gg; g.clearRect(0, 0, 520, 300);
+  const ax = AX[S.axis], cur = nowRec(), pts = S.recs;
+  const xr = ax.x === "V" ? [0, 20] : ax.x === "invV" ? [0, 0.25] : ax.x === "n" ? [0, 1] : S.degC ? [-300, 400] : [0, 600];
+  const yAll = pts.map(r => r[ax.y]).concat([cur[ax.y]]), ymax = ax.y === "V" ? 20 : niceUp(Math.max(1, ...yAll) * 1.1);
+  const X = v => GX0 + (v - xr[0]) / (xr[1] - xr[0]) * (GX1 - GX0), Y = v => GY1 - v / ymax * (GY1 - GY0);
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let i = 0; i <= 5; i++) { const v = ymax * i / 5; g.beginPath(); g.moveTo(GX0, Y(v)); g.lineTo(GX1, Y(v)); g.stroke(); g.fillText(+v.toFixed(2), GX0 - 5, Y(v) + 4); }
+  g.textAlign = "center";
+  const xs = (xr[1] - xr[0]) / (S.degC && ax.x === "T" ? 7 : 5);
+  for (let v = xr[0]; v <= xr[1] + 1e-9; v += xs) { g.beginPath(); g.moveTo(X(v), GY0); g.lineTo(X(v), GY1); g.stroke(); g.fillText(+v.toFixed(3), X(v), GY1 + 15); }
+  if (S.degC && ax.x === "T") { g.strokeStyle = "#94a3b8"; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(X(-273), GY0); g.lineTo(X(-273), GY1); g.stroke(); g.setLineDash([]); g.fillStyle = "#64748b"; g.fillText("−273 °C", X(-273), GY0 + 10); }
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, GY0); g.lineTo(GX0, GY1); g.lineTo(GX1, GY1); g.stroke();
+  g.font = "bold 12px Arial"; g.fillStyle = "#1f2937";
+  g.fillText(ax.x === "T" ? (S.degC ? "Temperature (°C)" : "Temperature (K)") : QLBL[ax.x], (GX0 + GX1) / 2, GY1 + 36);
+  g.save(); g.translate(14, (GY0 + GY1) / 2); g.rotate(-Math.PI / 2); g.fillText(QLBL[ax.y], 0, 0); g.restore();
+  // trend line or curve through the recorded points
+  if (pts.length >= 2) {
+    g.save(); g.beginPath(); g.rect(GX0, GY0, GX1 - GX0, GY1 - GY0); g.clip();
+    g.strokeStyle = "#059669"; g.lineWidth = 2; g.setLineDash([7, 5]); g.beginPath();
+    if (S.axis === "PV") {
+      const k = pts.reduce((t, r) => t + r.P * r.V, 0) / pts.length;
+      for (let i = 0; i <= 200; i++) { const v = 0.3 + (20 - 0.3) * i / 200, y = Y(k / v); i ? g.lineTo(X(v), y) : g.moveTo(X(v), y); }
+    } else {
+      const xsP = pts.map(r => xval(r, ax.x)), ysP = pts.map(r => r[ax.y]);
+      const mx = xsP.reduce((a, b) => a + b) / xsP.length, my = ysP.reduce((a, b) => a + b) / ysP.length;
+      let sxx = 0, sxy = 0; for (let i = 0; i < xsP.length; i++) { sxx += (xsP[i] - mx) ** 2; sxy += (xsP[i] - mx) * (ysP[i] - my); }
+      if (sxx > 1e-12) {
+        const b = sxy / sxx, a = my - b * mx; S.fit = {a, b};
+        g.moveTo(X(xr[0]), Y(a + b * xr[0])); g.lineTo(X(xr[1]), Y(a + b * xr[1]));
+      } else S.fit = null;
+    }
+    g.stroke(); g.setLineDash([]); g.restore();
+  } else S.fit = null;
+  // recorded points
+  for (const r of pts) { g.beginPath(); g.arc(X(xval(r, ax.x)), Y(r[ax.y]), 5.5, 0, 6.283); g.fillStyle = "#1d4ed8"; g.fill(); }
+  // where the gas is right now
+  const cx = X(xval(cur, ax.x)), cy = Y(cur[ax.y]);
+  if (cx >= GX0 - 2 && cx <= GX1 + 2 && cy >= GY0 - 2) { g.beginPath(); g.arc(cx, cy, 7, 0, 6.283); g.strokeStyle = "#dc2626"; g.lineWidth = 2.5; g.stroke(); }
+  // x-intercept label for temperature graphs
+  if (S.fit && ax.x === "T" && S.fit.b > 0) {
+    const x0 = -S.fit.a / S.fit.b; g.fillStyle = "#047857"; g.font = "bold 12px Arial"; g.textAlign = "left";
+    g.fillText(`line reaches zero at ${S.degC ? Math.round(x0) + " °C" : Math.round(x0) + " K"}`, GX0 + 8, GY0 + 14);
+  }
+}
+function drawMix() {
+  const g = gg; g.clearRect(0, 0, 520, 300);
+  const pa = Pgas("He"), pb = Pgas("Xe"), pt = pa + pb, ymax = niceUp(Math.max(1, pt) * 1.15);
+  const Y = v => GY1 - v / ymax * (GY1 - GY0);
+  g.strokeStyle = "#e2e8f0"; g.lineWidth = 1; g.fillStyle = "#6b7280"; g.font = "11px Arial"; g.textAlign = "right";
+  for (let i = 0; i <= 5; i++) { const v = ymax * i / 5; g.beginPath(); g.moveTo(GX0, Y(v)); g.lineTo(GX1, Y(v)); g.stroke(); g.fillText(+v.toFixed(2), GX0 - 5, Y(v) + 4); }
+  g.save(); g.translate(14, (GY0 + GY1) / 2); g.rotate(-Math.PI / 2); g.textAlign = "center"; g.font = "bold 12px Arial"; g.fillStyle = "#1f2937"; g.fillText("Pressure (atm)", 0, 0); g.restore();
+  const bars = [["He", [[pa, GASES.He.col]]], ["Xe", [[pb, GASES.Xe.col]]], ["Total", [[pa, GASES.He.col], [pb, GASES.Xe.col]]]];
+  bars.forEach(([lbl, segs], i) => {
+    const x = GX0 + 40 + i * 145, w = 90; let base = 0;
+    for (const [v, col] of segs) { g.fillStyle = col; g.globalAlpha = 0.85; g.fillRect(x, Y(base + v), w, Y(base) - Y(base + v)); base += v; }
+    g.globalAlpha = 1; g.fillStyle = "#1f2937"; g.font = "bold 13px Arial"; g.textAlign = "center";
+    g.fillText(lbl === "Total" ? "Total" : "P(" + lbl + ")", x + w / 2, GY1 + 18);
+    g.fillText(sig3(base) + " atm", x + w / 2, Y(base) - 6);
+  });
+  g.fillStyle = "#475569"; g.font = "14px Arial"; g.textAlign = "center"; g.fillText("=", GX0 + 40 + 145 * 2 - 28, Y(pt / 2) + 5); g.fillText("+", GX0 + 40 + 145 - 28, Y(Math.max(pa, pb) / 2) + 5);
+  g.strokeStyle = "#475569"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(GX0, GY0); g.lineTo(GX0, GY1); g.lineTo(GX1, GY1); g.stroke();
+}
+
+// ---------------------------------------------------------------- tables
+function drawTable() {
+  if (S.mode === "mix") {
+    const pt = Ptot(), nt = nTot(), push = g => Math.sqrt(GASES[g].M * S.T) / Math.sqrt(GASES.He.M * 300);
+    const row = g => { const n = count(g) * PER, X = nt ? n / nt : 0; return `<tr><td><b style="color:${GASES[g].col}">${GASES[g].f}</b> (${(GASES[g].M * 1000).toFixed(0)} g/mol)</td><td>${n.toFixed(2)}</td><td>${X.toFixed(2)}</td><td>${sig3(Pgas(g))}</td><td>${Math.round(S.rate[g] / 5) * 5}</td><td>${push(g).toFixed(1)}</td></tr>`; };
+    $("table").innerHTML = `<tr><th>Gas</th><th>Moles</th><th>Mole fraction</th><th>Partial pressure (atm)</th><th>Wall hits per second</th><th>Push per hit (He at 300 K = 1)</th></tr>` +
+      row("He") + row("Xe") + `<tr><td><b>Total</b></td><td>${nt.toFixed(2)}</td><td>1.00</td><td><b>${sig3(pt)}</b></td><td></td><td></td></tr>`;
+    return;
+  }
+  const ax = AX[S.axis];
+  if (!S.recs.length) { $("table").innerHTML = `<tr><td class="note" style="border:0">No data yet. Change one variable, wait for the piston to settle, and press <b>Record data point</b>.</td></tr>`; return; }
+  $("table").innerHTML = `<tr><th>n (mol)</th><th>T (K)</th><th>V (L)</th><th>P (atm)</th><th>${ax.calcLbl}</th></tr>` +
+    S.recs.map(r => `<tr><td>${r.n.toFixed(2)}</td><td>${r.T}</td><td>${r.V.toFixed(1)}</td><td>${sig3(r.P)}</td><td class="k">${sig3(calcVal(r, ax.calc))}</td></tr>`).join("");
+}
+
+// ---------------------------------------------------------------- explanations
+let lastWhy = "start";
+function explain(kind) {
+  lastWhy = kind;
+  const lock = S.hold === "V";
+  const T = {
+    start: S.mode === "mix"
+      ? "Each gas in the mixture hits the walls on its own. The pressure of each gas alone is its <b>partial pressure</b>, and the total pressure is their sum: <b>P<sub>total</sub> = P<sub>He</sub> + P<sub>Xe</sub></b> (Dalton's law)."
+      : "The pressure of a gas comes from its molecules <b>hitting the walls</b> (the orange flashes). Change one variable at a time, record a point after each change, and pick the graph that matches what you changed.",
+    hotter: lock
+      ? "Hotter, with the piston locked: the molecules move faster, so they hit the walls <b>more often and harder</b>. The pressure goes up in proportion to the Kelvin temperature: <b>P ∝ T</b> (Gay-Lussac's law)."
+      : "Hotter, with the piston free: faster molecules push the piston up until the gas pressure again equals the outside pressure. The volume goes up in proportion to the Kelvin temperature: <b>V ∝ T</b> (Charles's law).",
+    colder: lock
+      ? "Colder, with the piston locked: slower molecules hit the walls less often and less hard, so the pressure drops: <b>P ∝ T</b>."
+      : "Colder, with the piston free: the gas pushes less, so the outside pressure pushes the piston down until the pressures match again: <b>V ∝ T</b>.",
+    smaller: "Smaller volume: the same molecules are crowded into less space, so each part of the wall gets hit <b>more often</b> (but not harder; the temperature is the same). The pressure goes up: <b>P ∝ 1/V</b> (Boyle's law).",
+    bigger: "Bigger volume: the molecules have further to travel between hits, so each part of the wall is hit less often and the pressure drops: <b>P ∝ 1/V</b> (Boyle's law).",
+    more: lock
+      ? "More gas, piston locked: more molecules means more hits on the walls each second, so the pressure goes up: <b>P ∝ n</b>."
+      : "More gas, piston free: the extra molecules push the piston up until the pressure matches the outside again: <b>V ∝ n</b> (Avogadro's law).",
+    less: lock ? "Less gas, piston locked: fewer hits each second, so the pressure drops: <b>P ∝ n</b>." : "Less gas, piston free: the piston moves down until the pressure matches the outside again: <b>V ∝ n</b> (Avogadro's law).",
+    pup: "More pressure from outside: the piston moves down and squeezes the gas until the gas pressure matches the outside pressure. <b>P ∝ 1/V</b> (Boyle's law).",
+    pdown: "Less pressure from outside: the gas pushes the piston up and expands until its pressure matches the outside pressure. <b>P ∝ 1/V</b> (Boyle's law).",
+    lock: "The piston is now <b>locked</b>: the volume cannot change, so changing the temperature or the amount of gas changes the <b>pressure</b>.",
+    free: "The piston is now <b>free</b>: it moves until the gas pressure equals the outside pressure. Changing the temperature or the amount of gas now changes the <b>volume</b>.",
+    mixamt: "Adding more of one gas raises only <b>its</b> partial pressure; the other gas does not notice. Each partial pressure equals its mole fraction times the total: <b>P<sub>A</sub> = X<sub>A</sub> P<sub>total</sub></b>.",
+    mixsame: "Equal moles give <b>equal partial pressures</b>, even though a xenon atom is 33 times heavier than a helium atom. Helium atoms are light and fast, so they hit the walls <b>more often</b>; xenon atoms are slow, but each hit pushes <b>harder</b>. Compare the last two columns.",
+    mixT: "Changing the temperature changes both partial pressures by the same factor, so the mole fractions and the ratio of the partial pressures stay the same.",
+    mixV: "Changing the volume changes both partial pressures by the same factor (Boyle's law for each gas), so the mole fractions stay the same."
+  };
+  let h = T[kind];
+  if (S.mode === "laws" && kind !== "lock" && kind !== "free") h += warnHeld();
+  $("why").innerHTML = h;
+}
+function warnHeld() {
+  if (S.recs.length < 2) return "";
+  const ax = AX[S.axis], ch = ax.held.filter(v => { const vals = S.recs.map(r => r[v]); return (Math.max(...vals) - Math.min(...vals)) > 0.01 * Math.max(...vals); });
+  if (!ch.length) return `<br><span style="color:#047857">${ax.law}. Look at the last column of the table: it stays (about) the same.</span>`;
+  return `<br><span class="warn">Careful: for a ${AXNAME[S.axis]} graph, ${ax.held.map(v => VARNAME[v]).join(" and ")} must stay the same, but ${ch.map(v => VARNAME[v]).join(" and ")} changed between your points. Clear the points and change only one thing.</span>`;
+}
+
+// ---------------------------------------------------------------- controls
+function showVals() {
+  $("nv").textContent = `${S.n.toFixed(2)} mol`; $("nav").textContent = `${S.na.toFixed(2)} mol`; $("nbv").textContent = `${S.nb.toFixed(2)} mol`;
+  $("tempv").textContent = `${S.T} K (${S.T - 273} °C)`; $("volv").textContent = `${S.V.toFixed(1)} L`; $("pextv").textContent = `${S.Pext.toFixed(2)} atm`;
+}
+function setHold(h) {
+  if (h === S.hold) return;
+  if (h === "P") { S.Pext = Math.max(0.2, Math.min(10, Math.round(Ptot() / 0.05) * 0.05)); $("pext").value = S.Pext; }
+  else { S.V = Math.round(vol() * 10) / 10; $("vol").value = S.V; }
+  S.hold = h; layout(); showVals(); explain(h === "V" ? "lock" : "free");
+}
+function layout() {
+  const laws = S.mode === "laws";
+  for (const e of document.querySelectorAll(".lw")) e.style.display = laws ? "" : "none";
+  for (const e of document.querySelectorAll(".mx")) e.style.display = laws ? "none" : "";
+  const free = laws && S.hold === "P";
+  for (const e of document.querySelectorAll(".fr")) e.style.display = free ? "" : "none";
+  $("vlbl").style.display = $("vrow").style.display = free ? "none" : "";
+  $("b-lock").classList.toggle("on", S.hold === "V"); $("b-free").classList.toggle("on", S.hold === "P");
+  $("degc-l").style.display = AX[S.axis].x === "T" ? "" : "none";
+}
+$("b-lock").onclick = () => setHold("V"); $("b-free").onclick = () => setHold("P");
+$("n").addEventListener("input", e => { const v = +e.target.value, up = v > S.n; S.n = v; setCount("N2", Math.round(v / PER), up); showVals(); explain(up ? "more" : "less"); });
+$("na").addEventListener("input", e => { S.na = +e.target.value; setCount("He", Math.round(S.na / PER), true); showVals(); explain(Math.abs(S.na - S.nb) < 1e-9 && S.na > 0 ? "mixsame" : "mixamt"); });
+$("nb").addEventListener("input", e => { S.nb = +e.target.value; setCount("Xe", Math.round(S.nb / PER), true); showVals(); explain(Math.abs(S.na - S.nb) < 1e-9 && S.na > 0 ? "mixsame" : "mixamt"); });
+$("temp").addEventListener("input", e => { const v = +e.target.value, up = v > S.T; S.T = v; showVals(); explain(S.mode === "mix" ? "mixT" : up ? "hotter" : "colder"); });
+$("vol").addEventListener("input", e => { const v = +e.target.value, up = v > S.V; S.V = v; showVals(); explain(S.mode === "mix" ? "mixV" : up ? "bigger" : "smaller"); });
+$("pext").addEventListener("input", e => { const v = +e.target.value, up = v > S.Pext; S.Pext = v; showVals(); explain(up ? "pup" : "pdown"); });
+$("b-pause").onclick = () => { S.paused = !S.paused; $("b-pause").textContent = S.paused ? "▶ Run" : "❚❚ Pause"; };
+$("b-rec").onclick = () => {
+  if (Math.abs(targetV() / VMAX * HMAX - S.h) > 0.3) { $("why").innerHTML = "Wait until the piston stops moving, then record."; return; }
+  if (S.stop) { $("why").innerHTML = "<span class=\"warn\">The piston is resting on a stop, so the gas pressure is not equal to the outside pressure. Change the outside pressure (or the temperature or amount) so the piston floats, then record.</span>"; return; }
+  if (S.recs.length >= 15) S.recs.shift();
+  const r = nowRec(); r.V = Math.round(r.V * 10) / 10; r.P = r.n * RL * r.T / r.V;
+  S.recs.push(r); drawTable(); explain(lastWhy === "lock" || lastWhy === "free" ? "start" : lastWhy);
+};
+$("b-clear").onclick = () => { S.recs = []; drawTable(); explain("start"); };
+$("axis").onchange = () => { S.axis = $("axis").value; layout(); drawTable(); explain(lastWhy); };
+$("degc").onchange = () => { S.degC = $("degc").checked; };
+// drag the locked piston
+function bPoint(ev) { const r = box.getBoundingClientRect(); return {x: (ev.clientX - r.left) / r.width * W, y: (ev.clientY - r.top) / r.height * H}; }
+let pDrag = false;
+box.addEventListener("pointerdown", ev => {
+  if (S.hold !== "V" && S.mode === "laws") return;
+  const p = bPoint(ev);
+  if (p.x > X0 - 15 && p.x < X1 + 15 && Math.abs(p.y - (yTop() - 6)) < 22) { pDrag = true; box.setPointerCapture(ev.pointerId); ev.preventDefault(); }
+});
+box.addEventListener("pointermove", ev => {
+  if (!pDrag) return;
+  const p = bPoint(ev), v = Math.max(VMIN, Math.min(VMAX, Math.round((YB - p.y - 6) / HMAX * VMAX * 10) / 10));
+  if (v !== S.V) { const up = v > S.V; S.V = v; $("vol").value = v; showVals(); explain(S.mode === "mix" ? "mixV" : up ? "bigger" : "smaller"); }
+});
+box.addEventListener("pointerup", () => { pDrag = false; });
+function legend() {
+  $("legend").innerHTML = S.mode === "mix"
+    ? `<span><span class="dot" style="background:${GASES.He.col}"></span>He (4 g/mol)</span><span><span class="dot" style="background:${GASES.Xe.col}"></span>Xe (131 g/mol)</span><span><span class="dot" style="background:#ea580c;border-radius:2px"></span>hit on a wall</span>`
+    : `<span>Color shows speed: slow<span class="grad"></span>fast</span><span><span class="dot" style="background:#ea580c;border-radius:2px"></span>hit on a wall</span>`;
+  $("glegend").innerHTML = S.mode === "mix" ? "" : `<span><span class="dot" style="background:#1d4ed8"></span>recorded points</span><span><span class="dot" style="background:#fff;border:2.5px solid #dc2626"></span>the gas right now</span><span style="color:#059669">- - trend through your points</span>`;
+}
+function setMode(m) {
+  S.mode = m; S.parts = []; S.T = 300; $("temp").value = 300;
+  for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.setAttribute("aria-selected", b.dataset.mode === m ? "true" : "false");
+  for (const s of document.querySelectorAll(".mode")) s.classList.toggle("active", s.id === "m-" + m);
+  if (m === "laws") { S.hold = "V"; S.V = 9.8; S.n = 0.4; $("n").value = S.n; setCount("N2", Math.round(S.n / PER)); }
+  else { S.V = 12.3; S.na = 0.3; S.nb = 0.3; $("na").value = S.na; $("nb").value = S.nb; setCount("He", Math.round(S.na / PER)); setCount("Xe", Math.round(S.nb / PER)); }
+  $("vol").value = S.V; S.h = S.V / VMAX * HMAX;
+  $("foot").innerHTML = m === "laws"
+    ? "This is an ideal gas: the molecules have no size and do not attract each other, so they only collide with the walls. Each drawn molecule stands for 0.005 mol. The speeds are real (about 500 m/s for N₂ at room temperature) but slowed down about 8,000 times."
+    : "Ideal gases: the molecules do not attract each other, so each gas behaves as if it were alone in the container. The push per hit is proportional to √(mass × T).";
+  layout(); showVals(); legend(); drawTable(); explain("start");
+  if (tour.els && tour.mode !== m) tourEnd(false);
+  if (tour.auto && !tourSeen(m)) setTimeout(() => tourStart(m), 500);
+}
+for (const b of document.querySelectorAll(".tabs button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+
+// ---------------------------------------------------------------- first-visit tours
+const TOURS = {
+  laws: [
+    ["#box", "Gas molecules in a container with a piston on top. Every orange flash is a molecule hitting a wall: those hits are the gas pressure. The gauge shows the pressure."],
+    ["#ctl", "Lock the piston to keep the volume constant, or let it move freely to keep the pressure constant. Then change <b>one</b> thing: the amount of gas, the temperature, or the volume (you can also drag the piston)."],
+    ["#graphcard", "After each change, press <b>Record data point</b>. Choose the graph that matches what you changed. The table's last column shows what stays constant."]
+  ],
+  mix: [
+    ["#box", "A mixture of helium (small, fast) and xenon (big, slow). Each gas hits the walls on its own."],
+    ["#ctl", "Change the amount of each gas, the temperature or the volume."],
+    ["#graphcard", "The pressure of each gas alone (its partial pressure) and the total. The table compares how often and how hard each gas hits the walls."]
+  ]
+};
+const tour = {mode: null, i: 0, els: null, auto: true};
+const seenKey = m => "chemsim-gas-tour-" + m;
+function tourSeen(m) { try { return localStorage.getItem(seenKey(m)) === "1"; } catch (e) { return false; } }
+function tourMark(m) { try { localStorage.setItem(seenKey(m), "1"); } catch (e) { /* private mode */ } }
+function tourStart(m) {
+  tourEnd(false); if (!TOURS[m]) return;
+  tour.mode = m; tour.i = 0;
+  const block = document.createElement("div"); block.className = "tour-block";
+  const hole = document.createElement("div"); hole.className = "tour-hole";
+  const card = document.createElement("div"); card.className = "tour-card"; card.setAttribute("role", "dialog"); card.setAttribute("aria-live", "polite");
+  document.body.append(block, hole, card);
+  tour.els = {block, hole, card};
+  card.addEventListener("click", ev => {
+    const b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.t === "next") { if (tour.i < TOURS[m].length - 1) { tour.i++; tourShow(true); } else tourEnd(true); }
+    if (b.dataset.t === "back" && tour.i > 0) { tour.i--; tourShow(true); }
+    if (b.dataset.t === "skip") tourEnd(true);
+  });
+  tourShow(true);
+}
+function tourShow(scroll) {
+  if (!tour.els) return;
+  const steps = TOURS[tour.mode], [sel, text] = steps[tour.i], n = steps.length;
+  const {block, hole, card} = tour.els, de = document.documentElement;
+  block.style.width = de.scrollWidth + "px"; block.style.height = de.scrollHeight + "px";
+  const r = document.querySelector(sel).getBoundingClientRect(), sx = window.scrollX, sy = window.scrollY, pad = 6;
+  const hx = r.left + sx - pad, hy = r.top + sy - pad, hw = r.width + 2 * pad, hh = r.height + 2 * pad;
+  Object.assign(hole.style, {left: hx + "px", top: hy + "px", width: hw + "px", height: hh + "px"});
+  const names = {laws: "Gas laws", mix: "Partial pressures"};
+  card.innerHTML = `<div class="tstep">${names[tour.mode]} · ${tour.i + 1} of ${n}</div><div>${text}</div>
+    <div class="tbtns"><button class="skip" data-t="skip">Skip tour</button>${tour.i ? '<button data-t="back">Back</button>' : ""}
+    <button class="primary" data-t="next">${tour.i < n - 1 ? "Next" : "Got it"}</button></div>`;
+  const cw = card.offsetWidth, ch = card.offsetHeight, docH = de.scrollHeight;
+  let cy = hy + hh + 12;
+  if (cy + ch > docH - 8 && hy - ch - 12 > 0) cy = hy - ch - 12;
+  const cx = Math.max(16 + sx, Math.min(hx, sx + de.clientWidth - cw - 16));
+  Object.assign(card.style, {left: cx + "px", top: cy + "px"});
+  if (scroll) {
+    const top = Math.min(hy, cy), h = Math.max(hy + hh, cy + ch) - top;
+    let f = document.getElementById("tour-focus");
+    if (!f) { f = document.createElement("div"); f.id = "tour-focus"; f.style.cssText = "position:absolute;left:0;width:1px;pointer-events:none"; document.body.appendChild(f); }
+    f.style.top = top + "px"; f.style.height = h + "px";
+    f.scrollIntoView({block: h < window.innerHeight * 0.9 ? "center" : "start", behavior: "smooth"});
+    card.querySelector('[data-t="next"]').focus({preventScroll: true});
+  }
+}
+function tourEnd(markSeen) {
+  if (!tour.els) return;
+  if (markSeen) tourMark(tour.mode);
+  for (const e of Object.values(tour.els)) e.remove();
+  tour.els = null; tour.mode = null;
+}
+window.addEventListener("resize", () => tourShow(false));
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && tour.els) tourEnd(true); });
+
+// ---------------------------------------------------------------- run
+let last = performance.now(), tableT = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (!S.paused) step(dt);
+  drawBox(); S.mode === "mix" ? drawMix() : drawLaws();
+  if (S.mode === "mix" && (tableT -= dt) <= 0) { tableT = 0.5; drawTable(); }
+  requestAnimationFrame(frame);
+}
+(function init() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("title") === "0") $("title").style.display = "none";
+  if (q.get("tour") === "0") tour.auto = false;
+  const g = q.get("graph"); if (g && AX[g]) { S.axis = g; $("axis").value = g; }
+  $("tour-btn").onclick = () => tourStart(S.mode);
+  setMode(q.get("mode") === "mix" ? "mix" : "laws");
+  requestAnimationFrame(frame);
+})();
+// tell an embedding page (filter_chemsim) how tall we are
+(function () {
+  if (window.parent === window) return;
+  const send = () => window.parent.postMessage({chemsim: "height", h: document.documentElement.scrollHeight}, "*");
+  new ResizeObserver(send).observe(document.body); window.addEventListener("load", send);
+})();
+</script>
+<script>
+// Full-screen view (opened from Moodle with ?back=...): show a bar that leads back to the course page.
+(function () {
+  if (window.parent !== window) return;
+  var b = new URLSearchParams(location.search).get("back"), u;
+  if (!b) return;
+  try { u = new URL(b, location.href); } catch (e) { return; }
+  if (u.origin !== location.origin) return;   // only ever lead back into this site
+  var bar = document.createElement("div");
+  bar.setAttribute("style", "position:sticky;top:0;z-index:50;background:#1e293b;margin:-12px -16px 12px;padding:8px 16px;display:flex;align-items:center;gap:12px");
+  var a = document.createElement("a");
+  a.href = u.href; a.textContent = "\u2190 Back to Moodle";
+  a.setAttribute("style", "color:#fff;font:bold 15px Arial,sans-serif;text-decoration:none;padding:8px 12px;border:1px solid #64748b;border-radius:8px;background:#334155");
+  bar.appendChild(a);
+  document.body.insertBefore(bar, document.body.firstChild);
+})();
+</script>
+</body>
+</html>

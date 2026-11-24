@@ -100,6 +100,13 @@ final class text_filter_test extends \advanced_testcase {
         $this->assertStringContainsString('Solubility box', $out);
     }
 
+    public function test_gaslaws_and_kinetics_options(): void {
+        $out = $this->run_filter('[chemsim gaslaws mode=mix graph=VT] [chemsim kinetics mode=identify order=2 k=5]');
+        $this->assertStringContainsString('gaslaws.html?mode=mix&amp;graph=VT', $out);
+        $this->assertStringContainsString('kinetics.html?mode=identify&amp;order=2&amp;v=', $out);
+        $this->assertStringNotContainsString('k=5', $out);
+    }
+
     public function test_text_without_shortcode_unchanged(): void {
         $text = '<p>No simulations here [chem] at all.</p>';
         $this->assertSame($text, $this->run_filter($text));
